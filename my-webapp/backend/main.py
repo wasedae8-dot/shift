@@ -105,8 +105,10 @@ def diag_auth():
     return {
         "is_password_set": app_password is not None,
         "password_length": len(app_password) if app_password else 0,
-        "env_var_present": "APP_PASSWORD" in os.environ
+        "env_var_present": "APP_PASSWORD" in os.environ,
+        "env_database_url_present": "DATABASE_URL" in os.environ
     }
+
 
 @app.get("/api/auth/db-diag")
 def diag_db():
