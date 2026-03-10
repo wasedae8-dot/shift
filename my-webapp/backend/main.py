@@ -34,6 +34,10 @@ app.add_middleware(
 
 @app.middleware("http")
 async def password_protect(request, call_next):
+    # Allow OPTIONS requests for CORS preflight
+    if request.method == "OPTIONS":
+        return await call_next(request)
+        
     app_password = os.getenv("APP_PASSWORD")
     if app_password:
         app_password = app_password.strip()
@@ -44,8 +48,12 @@ async def password_protect(request, call_next):
             request_password = request.headers.get("X-App-Password")
             if request_password:
                 request_password = request_password.strip()
+            
+            # Debug log (Remove in production)
+            # print(f"DEBUG: Path={path}, Auth Header Present={'Yes' if request_password else 'No'}")
                 
             if request_password != app_password:
+                # print(f"DEBUG: Auth Failed. Header: '{request_password}', Expected: '{app_password}'")
                 from fastapi.responses import JSONResponse
                 return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     
