@@ -69,11 +69,24 @@ def read_root():
 @app.get("/api/auth/verify")
 def verify_auth():
     """
-    Endpoint for the frontend to verify if the pulse word is correct.
+    Endpoint for the frontend to verify if the password is correct.
     The actual check is performed by the password_protect middleware.
     If the request reaches here, it means the password is correct.
     """
     return {"status": "ok"}
+
+@app.get("/api/auth/diag")
+def diag_auth():
+    """
+    Diagnostics for the application password.
+    """
+    app_password = os.getenv("APP_PASSWORD")
+    return {
+        "is_password_set": app_password is not None,
+        "password_length": len(app_password) if app_password else 0,
+        "env_var_present": "APP_PASSWORD" in os.environ
+    }
+
 
 
 # --- Facilities ---
