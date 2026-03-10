@@ -10,8 +10,8 @@ from database import engine, get_db
 from solver import solve_schedule
 from datetime import datetime
 
-# Create the database tables
-models.Base.metadata.create_all(bind=engine)
+# Tables will be created in startup_event to avoid crashing on import if DB is down
+
 
 app = FastAPI(title="Shift Scheduling API")
 
@@ -22,6 +22,14 @@ async def startup_event():
         print(f"INFO: Application Password is set (length: {len(app_password)})")
     else:
         print("WARNING: APP_PASSWORD is NOT set. Authentication is DISABLED.")
+        
+    # Attempt to create tables, but don't crash if DB is not ready
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        print("INFO: Database tables verified/created.")
+    except Exception as e:
+        print(f"ERROR: Failed to initialize database tables: {e}")
+
 
 # Allow CORS for all origins
 app.add_middleware(
