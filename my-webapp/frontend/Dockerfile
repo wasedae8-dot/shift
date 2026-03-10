@@ -9,11 +9,14 @@ RUN npm install
 # Copy all files
 COPY . .
 
-# Next.js telemetry disable
+# Set build-time environment variables
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the app
 RUN npm run build
+
 
 # Expose port (Railway injects PORT env var)
 EXPOSE 3000

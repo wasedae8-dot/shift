@@ -82,10 +82,15 @@ def verify_auth(request: Request):
     app_password = app_password.strip()
     request_password = request.headers.get("X-App-Password", "").strip()
     
+    print(f"DEBUG: Verify Auth - Expected Len: {len(app_password)}, Got Len: {len(request_password)}")
+
     if request_password != app_password:
+        print(f"DEBUG: Verify Auth - FAILED")
         raise HTTPException(status_code=401, detail="Unauthorized")
         
+    print(f"DEBUG: Verify Auth - SUCCESS")
     return {"status": "ok"}
+
 
 @app.get("/api/auth/diag")
 def diag_auth():

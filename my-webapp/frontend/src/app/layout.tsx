@@ -15,16 +15,51 @@ export default function RootLayout({
   const pathname = usePathname();
 
   useEffect(() => {
-    const password = localStorage.getItem('app_password');
-    if (!password && pathname !== '/login') {
-      setIsAuthenticated(false);
-      router.push('/login');
-    } else if (password) {
-      setIsAuthenticated(true);
-    } else {
-      setIsAuthenticated(false);
-    }
+    const verifyStoredPassword = async () => {
+      const password = localStorage.getItem('app_password');
+      const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+
+      if (!password) {
+        if (pathname !== '/login') {
+          setIsAuthenticated(false);
+          router.push('/login');
+        } else {
+          setIsAuthenticated(false);
+        }
+        return;
+      }
+
+      // If on login page with a password, or any other page, verify it
+      try {
+        const response = await fetch(`${API_BASE}/api/auth/verify`, {
+          headers: { 'X-App-Password': password }
+        });
+        if (response.ok) {
+          setIsAuthenticated(true);
+          if (pathname === '/login') router.push('/');
+        } else {
+          localStorage.removeItem('app_password');
+          setIsAuthenticated(false);
+          router.push('/login');
+        }
+      } catch (err) {
+        console.error("Auth verification error:", err);
+        // If we can't reach the backend, we can't verify. 
+        // If we are already authenticated, keep it, otherwise redirect to login with error
+        if (isAuthenticated === null) {
+          // First load and can't reach backend. If not localhost, it's a real issue.
+          if (!API_BASE.includes('localhost')) {
+             // setError or handle accordingly. For now, let them stay on the state 
+             // but maybe they are stuck. Let's just set true if we can't check? 
+             // No, security first.
+          }
+        }
+      }
+    };
+
+    verifyStoredPassword();
   }, [pathname, router]);
+
 
   // Don't show anything until we've checked authentication
   if (isAuthenticated === null && pathname !== '/login') {
