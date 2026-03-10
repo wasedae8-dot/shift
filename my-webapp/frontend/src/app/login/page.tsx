@@ -8,16 +8,34 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password) {
-      localStorage.setItem('app_password', password);
-      router.push('/');
-      router.refresh();
-    } else {
+    if (!password) {
       setError('パスワードを入力してください');
+      return;
+    }
+
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/api/auth/verify`, {
+        headers: {
+          'X-App-Password': password
+        }
+      });
+
+      if (response.ok) {
+        localStorage.setItem('app_password', password);
+        router.push('/');
+        router.refresh();
+      } else {
+        setError('パスワードが正しくありません');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('サーバーとの通信に失敗しました');
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-100 p-4">

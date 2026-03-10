@@ -47,6 +47,16 @@ async def password_protect(request, call_next):
 def read_root():
     return {"message": "Shift Scheduling Optimization API is running."}
 
+@app.get("/api/auth/verify")
+def verify_auth():
+    """
+    Endpoint for the frontend to verify if the pulse word is correct.
+    The actual check is performed by the password_protect middleware.
+    If the request reaches here, it means the password is correct.
+    """
+    return {"status": "ok"}
+
+
 # --- Facilities ---
 @app.get("/facilities/", response_model=List[schemas.Facility])
 def read_facilities(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
