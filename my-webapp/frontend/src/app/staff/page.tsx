@@ -197,11 +197,11 @@ export default function StaffManagement() {
     setIsLoading(true);
     try {
       const response = await fetchWithAuth(`${API_BASE}/staff/`);
-
-
       if (response.ok) {
         const data = await response.json();
         setStaffList(data);
+      } else if (response.status === 401) {
+        window.location.href = '/login';
       }
     } catch (error) {
       console.error("Failed to fetch staff:", error);
@@ -214,7 +214,10 @@ export default function StaffManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     if (!form.name.trim()) return;
+    
+    setIsSaving(true);
     const payload = {
       ...form,
       ...(form.is_part_time ? {} : {
@@ -232,9 +235,15 @@ export default function StaffManagement() {
       if (response.ok) {
         setForm(defaultForm());
         fetchStaff();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        alert(`登録に失敗しました: ${data.detail || response.statusText}`);
       }
     } catch (error) {
       console.error("Error creating staff:", error);
+      alert("サーバーとの通信に失敗しました。URL設定を確認してください。");
+    } finally {
+      setIsSaving(false);
     }
   };
 

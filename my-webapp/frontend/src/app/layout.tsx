@@ -45,13 +45,12 @@ export default function RootLayout({
       } catch (err) {
         console.error("Auth verification error:", err);
         // If we can't reach the backend, we can't verify. 
-        // If we are already authenticated, keep it, otherwise redirect to login with error
+        // Stop the infinite spinner by setting a state
         if (isAuthenticated === null) {
-          // First load and can't reach backend. If not localhost, it's a real issue.
-          if (!API_BASE.includes('localhost')) {
-             // setError or handle accordingly. For now, let them stay on the state 
-             // but maybe they are stuck. Let's just set true if we can't check? 
-             // No, security first.
+          setIsAuthenticated(false);
+          // If we are not on login page, go there so they see the connection error
+          if (pathname !== '/login') {
+            router.push('/login');
           }
         }
       }
