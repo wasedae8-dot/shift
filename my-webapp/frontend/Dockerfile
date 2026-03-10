@@ -2,7 +2,7 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies only when needed
+# Install dependencies
 COPY package.json package-lock.json* ./
 RUN npm install
 
@@ -10,10 +10,13 @@ RUN npm install
 COPY . .
 
 # Next.js telemetry disable
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Expose port 3000
+# Build the app
+RUN npm run build
+
+# Expose port (Railway injects PORT env var)
 EXPOSE 3000
 
-# Start development server
-CMD ["npm", "run", "dev"]
+# Start production server
+CMD ["npm", "start"]

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
+import API_BASE from '../api';
+
 
 type Staff = {
   id: number;
@@ -192,7 +194,8 @@ export default function StaffManagement() {
   const fetchStaff = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/staff/');
+      const response = await fetch(`${API_BASE}/staff/`);
+
       if (response.ok) {
         const data = await response.json();
         setStaffList(data);
@@ -217,7 +220,8 @@ export default function StaffManagement() {
       }),
     };
     try {
-      const response = await fetch('http://localhost:8000/staff/', {
+      const response = await fetch(`${API_BASE}/staff/`, {
+
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -234,7 +238,8 @@ export default function StaffManagement() {
   const handleDelete = async (id: number) => {
     if (!confirm("本当に削除しますか？")) return;
     try {
-      const response = await fetch(`http://localhost:8000/staff/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_BASE}/staff/${id}`, { method: 'DELETE' });
+
       if (response.ok) fetchStaff();
     } catch (error) {
       console.error("Error deleting staff:", error);
@@ -274,7 +279,8 @@ export default function StaffManagement() {
       }),
     };
     try {
-      const response = await fetch(`http://localhost:8000/staff/${editingStaff.id}`, {
+      const response = await fetch(`${API_BASE}/staff/${editingStaff.id}`, {
+
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -319,7 +325,8 @@ export default function StaffManagement() {
     // Persist to backend
     const orderedIds = newList.map(s => s.id);
     try {
-      await fetch('http://localhost:8000/staff/reorder', {
+      await fetch(`${API_BASE}/staff/reorder`, {
+
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderedIds),

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import API_BASE from '../api';
+
 import { format, getDaysInMonth, addMonths, subMonths, isSameDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
@@ -44,8 +46,9 @@ export default function RequestsManagement() {
     setIsLoading(true);
     try {
       const [staffRes, reqRes] = await Promise.all([
-        fetch('http://localhost:8000/staff/'),
-        fetch('http://localhost:8000/requests/')
+        fetch(`${API_BASE}/staff/`),
+        fetch(`${API_BASE}/requests/`)
+
       ]);
       if (staffRes.ok && reqRes.ok) {
         setStaffList(await staffRes.json());
@@ -119,7 +122,8 @@ export default function RequestsManagement() {
       });
 
       const promises = allRequests.map(req =>
-        fetch('http://localhost:8000/requests/', {
+        fetch(`${API_BASE}/requests/`, {
+
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(req),
@@ -145,7 +149,8 @@ export default function RequestsManagement() {
   const handleDelete = async (id: number) => {
     if (!confirm("本当に削除しますか？")) return;
     try {
-      const response = await fetch(`http://localhost:8000/requests/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_BASE}/requests/${id}`, { method: 'DELETE' });
+
       if (response.ok) fetchData();
     } catch (error) {
       console.error("Error deleting request:", error);
@@ -157,7 +162,8 @@ export default function RequestsManagement() {
     setIsDeleting(true);
     try {
       const promises = requests.map(req =>
-        fetch(`http://localhost:8000/requests/${req.id}`, { method: 'DELETE' })
+        fetch(`${API_BASE}/requests/${req.id}`, { method: 'DELETE' })
+
       );
       await Promise.all(promises);
       fetchData();
