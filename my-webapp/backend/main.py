@@ -15,6 +15,14 @@ app = FastAPI(title="Shift Scheduling API")
 
 import os
 
+@app.on_event("startup")
+async def startup_event():
+    app_password = os.getenv("APP_PASSWORD")
+    if app_password:
+        print(f"INFO: Application Password is set (length: {len(app_password)})")
+    else:
+        print("WARNING: APP_PASSWORD is NOT set. Authentication is DISABLED.")
+
 # Allow CORS for all origins
 app.add_middleware(
     CORSMiddleware,
@@ -27,13 +35,16 @@ app.add_middleware(
 @app.middleware("http")
 async def password_protect(request, call_next):
     app_password = os.getenv("APP_PASSWORD")
-    # If password is not set in environment, allow all (for local/easier setup)
-    # If it is set, enforce it for all routes except root and docs
     if app_password:
+        app_password = app_password.strip()
         path = request.url.path
+        # Protect everything except basic info and docs
         if path not in ["/", "/docs", "/openapi.json", "/redoc"]:
             # Check custom header
             request_password = request.headers.get("X-App-Password")
+            if request_password:
+                request_password = request_password.strip()
+                
             if request_password != app_password:
                 from fastapi.responses import JSONResponse
                 return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
