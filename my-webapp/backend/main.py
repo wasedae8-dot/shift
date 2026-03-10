@@ -13,6 +13,8 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Shift Scheduling API")
 
+import os
+
 # Allow CORS for all origins
 app.add_middleware(
     CORSMiddleware,
@@ -21,6 +23,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def password_protect(request, call_next):
+    app_password = os.getenv("APP_PASSWORD")
+    # If password is not set in environment, allow all (for local/easier setup)
+    # If it is set, enforce it for all routes except root and docs
+    if app_password:
+        path = request.url.path
+        if path not in ["/", "/docs", "/openapi.json", "/redoc"]:
+            # Check custom header
+            request_password = request.headers.get("X-App-Password")
+            if request_password != app_password:
+                from fastapi.responses import JSONResponse
+                return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    
+    response = await call_next(request)
+    return response
+
 
 
 @app.get("/")

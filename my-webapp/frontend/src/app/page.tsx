@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 
-import API_BASE from './api';
+import API_BASE, { fetchWithAuth } from './api';
+
 
 import { format, getDaysInMonth } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -55,7 +56,8 @@ export default function Home() {
     setIsGenerating(true);
     setScheduleData(null);
     try {
-      const response = await fetch(`${API_BASE}/generate-schedule/?year=${year}&month=${month}`);
+      const response = await fetchWithAuth(`${API_BASE}/generate-schedule/?year=${year}&month=${month}`);
+
       if (!response.ok) {
         const errorData = await response.json();
         setScheduleData({ status: "failed", error: errorData.detail || "シフト作成に失敗しました" });

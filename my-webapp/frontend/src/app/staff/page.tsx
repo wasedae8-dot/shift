@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 
-import API_BASE from '../api';
+import API_BASE, { fetchWithAuth } from '../api';
+
 
 
 type Staff = {
@@ -195,7 +196,8 @@ export default function StaffManagement() {
   const fetchStaff = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/staff/`);
+      const response = await fetchWithAuth(`${API_BASE}/staff/`);
+
 
       if (response.ok) {
         const data = await response.json();
@@ -221,12 +223,12 @@ export default function StaffManagement() {
       }),
     };
     try {
-      const response = await fetch(`${API_BASE}/staff/`, {
-
+      const response = await fetchWithAuth(`${API_BASE}/staff/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
       if (response.ok) {
         setForm(defaultForm());
         fetchStaff();
@@ -239,7 +241,8 @@ export default function StaffManagement() {
   const handleDelete = async (id: number) => {
     if (!confirm("本当に削除しますか？")) return;
     try {
-      const response = await fetch(`${API_BASE}/staff/${id}`, { method: 'DELETE' });
+      const response = await fetchWithAuth(`${API_BASE}/staff/${id}`, { method: 'DELETE' });
+
 
       if (response.ok) fetchStaff();
     } catch (error) {
@@ -280,12 +283,12 @@ export default function StaffManagement() {
       }),
     };
     try {
-      const response = await fetch(`${API_BASE}/staff/${editingStaff.id}`, {
-
+      const response = await fetchWithAuth(`${API_BASE}/staff/${editingStaff.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
       if (response.ok) {
         setEditingStaff(null);
         fetchStaff();
@@ -326,12 +329,12 @@ export default function StaffManagement() {
     // Persist to backend
     const orderedIds = newList.map(s => s.id);
     try {
-      await fetch(`${API_BASE}/staff/reorder`, {
-
+      await fetchWithAuth(`${API_BASE}/staff/reorder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderedIds),
       });
+
     } catch (err) {
       console.error("Failed to save order:", err);
     }
