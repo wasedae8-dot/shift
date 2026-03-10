@@ -120,10 +120,10 @@ def diag_auth():
 @app.get("/api/auth/db-diag")
 def diag_db(db: Session = Depends(get_db)):
     """
-    Advanced diagnostics to find lost DB connections.
+    Deeper diagnostics to find any hidden environment variables.
     """
     import os
-    all_db_vars = {k: v[:20] + "..." for k, v in os.environ.items() if "URL" in k or "POSTGRES" in k or "DATABASE" in k}
+    all_keys = sorted(os.environ.keys())
     
     try:
         staff_count = db.query(models.Staff).count()
@@ -137,14 +137,15 @@ def diag_db(db: Session = Depends(get_db)):
             "db_host": masked_db,
             "staff_count": staff_count,
             "facility_count": fac_count,
-            "detected_db_vars": all_db_vars
+            "all_env_keys": all_keys
         }
     except Exception as e:
         return {
             "status": "error",
             "error": str(e),
-            "detected_db_vars": all_db_vars
+            "all_env_keys": all_keys
         }
+
 
 
 
