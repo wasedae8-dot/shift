@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+
 import API_BASE from './api';
 
 import { format, getDaysInMonth } from 'date-fns';
@@ -84,7 +85,8 @@ export default function Home() {
     if (month === 1 && [1, 2, 3].includes(day)) return true;
     
     // Check solver result
-    const daySchedule = scheduleData?.schedule?.find(s => s.day === day);
+    const daySchedule = scheduleData?.schedule?.find((s: DailySchedule) => s.day === day);
+
     return daySchedule?.is_closed || false;
   };
 
@@ -99,20 +101,22 @@ export default function Home() {
   const allStaff = useMemo(() => {
     if (scheduleData?.all_staff) {
       return Object.entries(scheduleData.all_staff)
-        .map(([id, name]) => ({ id: Number(id), name }))
-        .sort((a, b) => a.id - b.id);
+        .map(([id, name]: [string, string]) => ({ id: Number(id), name }))
+        .sort((a: {id: number}, b: {id: number}) => a.id - b.id);
+
     }
     
     // Fallback to extraction from schedule if all_staff isn't present
     if (!scheduleData?.schedule) return [];
     const staffMap = new Map<number, string>();
     scheduleData.schedule.forEach(day => {
-      day.staff.forEach(s => {
+      day.staff.forEach((s: StaffAssignment) => {
         if (!staffMap.has(s.staff_id)) {
           staffMap.set(s.staff_id, s.name);
         }
       });
-      day.absences?.forEach(a => {
+      day.absences?.forEach((a: Absence) => {
+
          if (!staffMap.has(a.staff_id)) {
            // We don't have the name here, so we'd need another source
            staffMap.set(a.staff_id, `Staff ${a.staff_id}`);
@@ -120,8 +124,9 @@ export default function Home() {
       });
     });
     return Array.from(staffMap.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.id - b.id);
+      .map(([id, name]: [number, string]) => ({ id, name }))
+      .sort((a: {id: number}, b: {id: number}) => a.id - b.id);
+
   }, [scheduleData]);
 
   const renderRoleBadge = (role: Role) => {
@@ -149,13 +154,15 @@ export default function Home() {
         if (s.is_driver) totals[day].driver += 1;
         s.roles.forEach((r: Role) => {
           if (r !== 'driver') {
-            totals[day][r] = (totals[day][r] || 0) + 1;
+            const currentTotal = totals[day][r] || 0;
+            totals[day][r as keyof typeof totals[number]] = currentTotal + 1;
           }
         });
       });
     });
     return totals;
   }, [scheduleData]);
+
 
   const exportToCsv = () => {
     if (!scheduleData?.schedule || !allStaff.length) return;
