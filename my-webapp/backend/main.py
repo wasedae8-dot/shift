@@ -27,8 +27,15 @@ async def startup_event():
     try:
         models.Base.metadata.create_all(bind=engine)
         print("INFO: Database tables verified/created.")
+        
+        # Run manual migration for sort_order column
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0"))
+        print("INFO: Migration (sort_order) verified.")
     except Exception as e:
-        print(f"ERROR: Failed to initialize database tables: {e}")
+        print(f"ERROR: Failed to initialize/migrate database: {e}")
+
 
 
 # Allow CORS for all origins
