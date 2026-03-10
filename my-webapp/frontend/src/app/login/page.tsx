@@ -31,29 +31,19 @@ export default function LoginPage() {
       console.log(`DEBUG: Response status: ${response.status}`);
 
       if (response.ok) {
-        console.log('DEBUG: Login successful, saving to localStorage');
+        console.log('DEBUG: Login successful');
         localStorage.setItem('app_password', password);
         router.push('/');
         router.refresh();
       } else {
-        let errorDetail = `エラー ${response.status}: パスワードが正しくありません`;
-        if (isLocalhost) {
-          errorDetail += `\n⚠️ 【注意】Railwayの設定(NEXT_PUBLIC_API_URL)が localhost のままです。管理画面から production のURLに変更してください。`;
-        }
-        console.error(`DEBUG: Login failed: ${errorDetail}`);
-        setError(errorDetail);
+        setError('パスワードが正しくありません');
       }
     } catch (err) {
       console.error('Login error:', err);
-      let networkError = `サーバーとの通信に失敗しました。`;
-      if (isLocalhost) {
-        networkError += `\n⚠️ 【重要】接続先が ${API_BASE} になっています。Railwayの Variables 画面で NEXT_PUBLIC_API_URL をバックエンドのURLに設定してください。`;
-      } else {
-        networkError += `\n接続先: ${API_BASE}\nネットワーク環境または設定を確認してください。`;
-      }
-      setError(networkError);
+      setError('サーバーとの通信に失敗しました。時間をおいて再度お試しください。');
     }
   };
+
 
 
 

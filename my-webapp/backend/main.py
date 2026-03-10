@@ -55,12 +55,8 @@ async def password_protect(request: Request, call_next):
                 request_password = request_password.strip()
             
             if request_password != app_password:
-                log_expected = app_password[0] if app_password else ""
-                log_got = request_password[0] if request_password else ""
-                print(f"DEBUG: Auth DENIED for {path}. Expected: '{log_expected}***', Got: '{log_got}***'")
                 return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-            else:
-                print(f"DEBUG: Auth GRANTED for {path}")
+
     
     response = await call_next(request)
     return response
