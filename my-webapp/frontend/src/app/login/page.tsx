@@ -18,6 +18,9 @@ export default function LoginPage() {
     const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
     console.log(`DEBUG: Attempting login to ${API_BASE}/api/auth/verify`);
     
+    // Check if API_BASE is likely wrong (localhost in production)
+    const isLocalhost = API_BASE.includes('localhost') || API_BASE.includes('127.0.0.1');
+    
     try {
       const response = await fetch(`${API_BASE}/api/auth/verify`, {
         headers: {
@@ -33,16 +36,25 @@ export default function LoginPage() {
         router.push('/');
         router.refresh();
       } else {
-        const errorDetail = `エラー ${response.status}: パスワードが正しくありません (接続先: ${API_BASE})`;
+        let errorDetail = `エラー ${response.status}: パスワードが正しくありません`;
+        if (isLocalhost) {
+          errorDetail += `\n⚠️ 【注意】Railwayの設定(NEXT_PUBLIC_API_URL)が localhost のままです。管理画面から production のURLに変更してください。`;
+        }
         console.error(`DEBUG: Login failed: ${errorDetail}`);
         setError(errorDetail);
       }
     } catch (err) {
       console.error('Login error:', err);
-      const networkError = `サーバーとの通信に失敗しました。接続先: ${API_BASE}. ネットワーク環境または環境変数 NEXT_PUBLIC_API_URL を確認してください。`;
+      let networkError = `サーバーとの通信に失敗しました。`;
+      if (isLocalhost) {
+        networkError += `\n⚠️ 【重要】接続先が ${API_BASE} になっています。Railwayの Variables 画面で NEXT_PUBLIC_API_URL をバックエンドのURLに設定してください。`;
+      } else {
+        networkError += `\n接続先: ${API_BASE}\nネットワーク環境または設定を確認してください。`;
+      }
       setError(networkError);
     }
   };
+
 
 
 
