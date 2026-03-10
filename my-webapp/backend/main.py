@@ -48,7 +48,7 @@ async def password_protect(request: Request, call_next):
     if app_password:
         app_password = app_password.strip()
         # Protect everything except basic info, docs, and diagnostics
-        if path not in ["/", "/docs", "/openapi.json", "/redoc", "/api/auth/diag"]:
+        if path not in ["/", "/docs", "/openapi.json", "/redoc", "/api/auth/diag", "/api/auth/db-diag"]:
             # Check custom header
             request_password = request.headers.get("X-App-Password")
             if request_password:
