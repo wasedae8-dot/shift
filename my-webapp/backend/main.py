@@ -101,32 +101,26 @@ def diag_auth():
     }
 
 @app.get("/api/auth/db-diag")
-def diag_db(db: Session = Depends(get_db)):
+def diag_db():
     """
-    Diagnostics for the database connection.
+    Diagnostics for the database connection (without hanging).
     """
-    try:
-        staff_count = db.query(models.Staff).count()
-        fac_count = db.query(models.Facility).count()
-        req_count = db.query(models.LeaveRequest).count()
-        
-        from database import SQLALCHEMY_DATABASE_URL
-        masked_db = SQLALCHEMY_DATABASE_URL.split("@")[-1] if "@" in SQLALCHEMY_DATABASE_URL else "local/sqlite?"
-        
-        return {
-            "status": "connected",
-            "db_host": masked_db,
-            "staff_count": staff_count,
-            "facility_count": fac_count,
-            "request_count": req_count,
-            "env_database_url_present": "DATABASE_URL" in os.environ
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "env_database_url_present": "DATABASE_URL" in os.environ
-        }
+    from database import SQLALCHEMY_DATABASE_URL
+    import os
+    
+    # Check simple presence
+    env_present = "DATABASE_URL" in os.environ
+    masked_db = SQLALCHEMY_DATABASE_URL.split("@")[-1] if "@" in SQLALCHEMY_DATABASE_URL else "local/sqlite?"
+    
+    # Try a quick connect with a short timeout if possible, 
+    # but for now just return the string info to avoid 502.
+    return {
+        "status": "diagnostic",
+        "env_database_url_present": env_present,
+        "db_host": masked_db,
+        "sqlalchemy_url_start": SQLALCHEMY_DATABASE_URL[:15] if SQLALCHEMY_DATABASE_URL else "none"
+    }
+
 
 
 # --- Facilities ---
