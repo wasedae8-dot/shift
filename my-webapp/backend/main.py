@@ -120,12 +120,14 @@ def diag_auth():
 @app.get("/api/auth/db-diag")
 def diag_db(db: Session = Depends(get_db)):
     """
-    Diagnostics for the database connection (now with queries).
+    Advanced diagnostics to find lost DB connections.
     """
+    import os
+    all_db_vars = {k: v[:20] + "..." for k, v in os.environ.items() if "URL" in k or "POSTGRES" in k or "DATABASE" in k}
+    
     try:
         staff_count = db.query(models.Staff).count()
         fac_count = db.query(models.Facility).count()
-        req_count = db.query(models.LeaveRequest).count()
         
         from database import SQLALCHEMY_DATABASE_URL
         masked_db = SQLALCHEMY_DATABASE_URL.split("@")[-1] if "@" in SQLALCHEMY_DATABASE_URL else "local/sqlite?"
@@ -135,15 +137,15 @@ def diag_db(db: Session = Depends(get_db)):
             "db_host": masked_db,
             "staff_count": staff_count,
             "facility_count": fac_count,
-            "request_count": req_count,
-            "env_database_url_present": "DATABASE_URL" in os.environ
+            "detected_db_vars": all_db_vars
         }
     except Exception as e:
         return {
             "status": "error",
             "error": str(e),
-            "env_database_url_present": "DATABASE_URL" in os.environ
+            "detected_db_vars": all_db_vars
         }
+
 
 
 
