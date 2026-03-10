@@ -15,8 +15,9 @@ export default function LoginPage() {
       return;
     }
 
+    const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(`${API_BASE}/api/auth/verify`, {
         headers: {
           'X-App-Password': password
@@ -28,13 +29,15 @@ export default function LoginPage() {
         router.push('/');
         router.refresh();
       } else {
-        setError('パスワードが正しくありません');
+        setError(`パスワードが正しくありません (接続先: ${API_BASE})`);
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('サーバーとの通信に失敗しました');
+      setError(`サーバーとの通信に失敗しました。環境変数 NEXT_PUBLIC_API_URL が正しく設定されているか確認してください。 (試行先: ${API_BASE})`);
     }
   };
+
+
 
 
   return (
