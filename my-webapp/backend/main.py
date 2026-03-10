@@ -1,7 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
+import os
 
 import models, schemas
 from database import engine, get_db
@@ -12,8 +14,6 @@ from datetime import datetime
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Shift Scheduling API")
-
-import os
 
 @app.on_event("startup")
 async def startup_event():
@@ -33,47 +33,58 @@ app.add_middleware(
 )
 
 @app.middleware("http")
-async def password_protect(request, call_next):
+async def password_protect(request: Request, call_next):
     # Allow OPTIONS requests for CORS preflight
     if request.method == "OPTIONS":
         return await call_next(request)
         
     app_password = os.getenv("APP_PASSWORD")
+    path = request.url.path
+    
+    # Debug logging for every request
+    has_header = "X-App-Password" in request.headers
+    print(f"DEBUG: {request.method} {path} - Has Header: {has_header}")
+
     if app_password:
         app_password = app_password.strip()
-        path = request.url.path
         # Protect everything except basic info, docs, and diagnostics
         if path not in ["/", "/docs", "/openapi.json", "/redoc", "/api/auth/diag"]:
-
             # Check custom header
             request_password = request.headers.get("X-App-Password")
             if request_password:
                 request_password = request_password.strip()
             
-            # Debug log (Remove in production)
-            # print(f"DEBUG: Path={path}, Auth Header Present={'Yes' if request_password else 'No'}")
-                
             if request_password != app_password:
-                # print(f"DEBUG: Auth Failed. Header: '{request_password}', Expected: '{app_password}'")
-                from fastapi.responses import JSONResponse
+                log_expected = app_password[0] if app_password else ""
+                log_got = request_password[0] if request_password else ""
+                print(f"DEBUG: Auth DENIED for {path}. Expected: '{log_expected}***', Got: '{log_got}***'")
                 return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+            else:
+                print(f"DEBUG: Auth GRANTED for {path}")
     
     response = await call_next(request)
     return response
-
-
 
 @app.get("/")
 def read_root():
     return {"message": "Shift Scheduling Optimization API is running."}
 
 @app.get("/api/auth/verify")
-def verify_auth():
+def verify_auth(request: Request):
     """
     Endpoint for the frontend to verify if the password is correct.
-    The actual check is performed by the password_protect middleware.
-    If the request reaches here, it means the password is correct.
+    Double-checked here in case middleware behaves unexpectedly.
     """
+    app_password = os.getenv("APP_PASSWORD")
+    if not app_password:
+        return {"status": "ok", "warning": "APP_PASSWORD not set"}
+        
+    app_password = app_password.strip()
+    request_password = request.headers.get("X-App-Password", "").strip()
+    
+    if request_password != app_password:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
     return {"status": "ok"}
 
 @app.get("/api/auth/diag")
@@ -87,8 +98,6 @@ def diag_auth():
         "password_length": len(app_password) if app_password else 0,
         "env_var_present": "APP_PASSWORD" in os.environ
     }
-
-
 
 # --- Facilities ---
 @app.get("/facilities/", response_model=List[schemas.Facility])
@@ -144,7 +153,6 @@ def update_staff(staff_id: int, staff: schemas.StaffCreate, db: Session = Depend
     db.commit()
     db.refresh(db_staff)
     return db_staff
-
 
 # --- Leave Requests ---
 @app.get("/requests/", response_model=List[schemas.LeaveRequest])

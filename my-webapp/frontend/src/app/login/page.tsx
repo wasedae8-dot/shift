@@ -16,6 +16,7 @@ export default function LoginPage() {
     }
 
     const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    console.log(`DEBUG: Attempting login to ${API_BASE}/api/auth/verify`);
     
     try {
       const response = await fetch(`${API_BASE}/api/auth/verify`, {
@@ -24,18 +25,25 @@ export default function LoginPage() {
         }
       });
 
+      console.log(`DEBUG: Response status: ${response.status}`);
+
       if (response.ok) {
+        console.log('DEBUG: Login successful, saving to localStorage');
         localStorage.setItem('app_password', password);
         router.push('/');
         router.refresh();
       } else {
-        setError(`パスワードが正しくありません (接続先: ${API_BASE})`);
+        const errorDetail = `エラー ${response.status}: パスワードが正しくありません (接続先: ${API_BASE})`;
+        console.error(`DEBUG: Login failed: ${errorDetail}`);
+        setError(errorDetail);
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError(`サーバーとの通信に失敗しました。環境変数 NEXT_PUBLIC_API_URL が正しく設定されているか確認してください。 (試行先: ${API_BASE})`);
+      const networkError = `サーバーとの通信に失敗しました。接続先: ${API_BASE}. ネットワーク環境または環境変数 NEXT_PUBLIC_API_URL を確認してください。`;
+      setError(networkError);
     }
   };
+
 
 
 
