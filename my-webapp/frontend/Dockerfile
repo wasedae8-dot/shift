@@ -19,4 +19,5 @@ RUN npm run build
 EXPOSE 3000
 
 # Start production server
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx next start -H 0.0.0.0 -p ${PORT:-3000}"]
+
