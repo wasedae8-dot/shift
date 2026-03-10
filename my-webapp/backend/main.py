@@ -33,9 +33,21 @@ async def startup_event():
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0"))
         print("INFO: Migration (sort_order) verified.")
+        
+        # Create a default facility if none exists to allow immediate registration
+        from database import SessionLocal
+        db = SessionLocal()
+        try:
+            if db.query(models.Facility).count() == 0:
+                default_facility = models.Facility(name="デフォルト施設")
+                db.add(default_facility)
+                db.commit()
+                print("INFO: Created default facility.")
+        finally:
+            db.close()
+            
     except Exception as e:
         print(f"ERROR: Failed to initialize/migrate database: {e}")
-
 
 
 # Allow CORS for all origins
@@ -56,14 +68,10 @@ async def password_protect(request: Request, call_next):
     app_password = os.getenv("APP_PASSWORD")
     path = request.url.path
     
-    # Debug logging for every request
-    has_header = "X-App-Password" in request.headers
-    print(f"DEBUG: {request.method} {path} - Has Header: {has_header}")
-
     if app_password:
         app_password = app_password.strip()
-        # Protect everything except basic info, docs, and diagnostics
-        if path not in ["/", "/docs", "/openapi.json", "/redoc", "/api/auth/diag", "/api/auth/db-diag"]:
+        # Protect everything except basic info and docs
+        if path not in ["/", "/docs", "/openapi.json", "/redoc"]:
             # Check custom header
             request_password = request.headers.get("X-App-Password")
             if request_password:
@@ -84,7 +92,6 @@ def read_root():
 def verify_auth(request: Request):
     """
     Endpoint for the frontend to verify if the password is correct.
-    Double-checked here in case middleware behaves unexpectedly.
     """
     app_password = os.getenv("APP_PASSWORD")
     if not app_password:
@@ -93,58 +100,11 @@ def verify_auth(request: Request):
     app_password = app_password.strip()
     request_password = request.headers.get("X-App-Password", "").strip()
     
-    print(f"DEBUG: Verify Auth - Expected Len: {len(app_password)}, Got Len: {len(request_password)}")
-
     if request_password != app_password:
-        print(f"DEBUG: Verify Auth - FAILED")
         raise HTTPException(status_code=401, detail="Unauthorized")
         
-    print(f"DEBUG: Verify Auth - SUCCESS")
     return {"status": "ok"}
 
-
-@app.get("/api/auth/diag")
-def diag_auth():
-    """
-    Diagnostics for the application password.
-    """
-    app_password = os.getenv("APP_PASSWORD")
-    return {
-        "is_password_set": app_password is not None,
-        "password_length": len(app_password) if app_password else 0,
-        "env_var_present": "APP_PASSWORD" in os.environ,
-        "env_database_url_present": "DATABASE_URL" in os.environ
-    }
-
-
-@app.get("/api/auth/db-diag")
-def diag_db(db: Session = Depends(get_db)):
-    """
-    Deeper diagnostics to find any hidden environment variables.
-    """
-    import os
-    all_keys = sorted(os.environ.keys())
-    
-    try:
-        staff_count = db.query(models.Staff).count()
-        fac_count = db.query(models.Facility).count()
-        
-        from database import SQLALCHEMY_DATABASE_URL
-        masked_db = SQLALCHEMY_DATABASE_URL.split("@")[-1] if "@" in SQLALCHEMY_DATABASE_URL else "local/sqlite?"
-        
-        return {
-            "status": "connected",
-            "db_host": masked_db,
-            "staff_count": staff_count,
-            "facility_count": fac_count,
-            "all_env_keys": all_keys
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "all_env_keys": all_keys
-        }
 
 
 
