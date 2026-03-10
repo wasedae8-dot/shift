@@ -100,6 +100,35 @@ def diag_auth():
         "env_var_present": "APP_PASSWORD" in os.environ
     }
 
+@app.get("/api/auth/db-diag")
+def diag_db(db: Session = Depends(get_db)):
+    """
+    Diagnostics for the database connection.
+    """
+    try:
+        staff_count = db.query(models.Staff).count()
+        fac_count = db.query(models.Facility).count()
+        req_count = db.query(models.LeaveRequest).count()
+        
+        from database import SQLALCHEMY_DATABASE_URL
+        masked_db = SQLALCHEMY_DATABASE_URL.split("@")[-1] if "@" in SQLALCHEMY_DATABASE_URL else "local/sqlite?"
+        
+        return {
+            "status": "connected",
+            "db_host": masked_db,
+            "staff_count": staff_count,
+            "facility_count": fac_count,
+            "request_count": req_count,
+            "env_database_url_present": "DATABASE_URL" in os.environ
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "env_database_url_present": "DATABASE_URL" in os.environ
+        }
+
+
 # --- Facilities ---
 @app.get("/facilities/", response_model=List[schemas.Facility])
 def read_facilities(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
