@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import API_BASE from '../api';
 
 export default function LoginPage() {
   const [password, setPassword] = useState('');
@@ -15,7 +16,7 @@ export default function LoginPage() {
       return;
     }
 
-    const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    
     console.log(`DEBUG: Attempting login to ${API_BASE}/api/auth/verify`);
     
     // Check if API_BASE is likely wrong (localhost in production)

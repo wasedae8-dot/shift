@@ -196,7 +196,7 @@ export default function StaffManagement() {
   const fetchStaff = async () => {
     setIsLoading(true);
     try {
-      const response = await fetchWithAuth(`${API_BASE}/staff/`);
+      const response = await fetchWithAuth(`${API_BASE}/api/staff/`);
       if (response.ok) {
         const data = await response.json();
         setStaffList(data);
@@ -226,7 +226,7 @@ export default function StaffManagement() {
       }),
     };
     try {
-      const response = await fetchWithAuth(`${API_BASE}/staff/`, {
+      const response = await fetchWithAuth(`${API_BASE}/api/staff/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -250,7 +250,7 @@ export default function StaffManagement() {
   const handleDelete = async (id: number) => {
     if (!confirm("本当に削除しますか？")) return;
     try {
-      const response = await fetchWithAuth(`${API_BASE}/staff/${id}`, { method: 'DELETE' });
+      const response = await fetchWithAuth(`${API_BASE}/api/staff/${id}`, { method: 'DELETE' });
 
 
       if (response.ok) fetchStaff();

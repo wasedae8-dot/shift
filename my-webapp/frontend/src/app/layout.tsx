@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import API_BASE from './api';
 import "./globals.css";
 
 export default function RootLayout({
@@ -17,7 +18,6 @@ export default function RootLayout({
   useEffect(() => {
     const verifyStoredPassword = async () => {
       const password = localStorage.getItem('app_password');
-      const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
       if (!password) {
         if (pathname !== '/login') {

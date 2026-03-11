@@ -47,8 +47,8 @@ export default function RequestsManagement() {
     setIsLoading(true);
     try {
       const [staffRes, reqRes] = await Promise.all([
-        fetchWithAuth(`${API_BASE}/staff/`),
-        fetchWithAuth(`${API_BASE}/requests/`)
+        fetchWithAuth(`${API_BASE}/api/staff/`),
+        fetchWithAuth(`${API_BASE}/api/requests/`)
       ]);
 
       if (staffRes.ok && reqRes.ok) {
@@ -123,7 +123,7 @@ export default function RequestsManagement() {
       });
 
       const promises = allRequests.map(req =>
-        fetchWithAuth(`${API_BASE}/requests/`, {
+        fetchWithAuth(`${API_BASE}/api/requests/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(req),
@@ -149,7 +149,7 @@ export default function RequestsManagement() {
   const handleDelete = async (id: number) => {
     if (!confirm("本当に削除しますか？")) return;
     try {
-      const response = await fetchWithAuth(`${API_BASE}/requests/${id}`, { method: 'DELETE' });
+      const response = await fetchWithAuth(`${API_BASE}/api/requests/${id}`, { method: 'DELETE' });
 
 
       if (response.ok) fetchData();
@@ -163,7 +163,7 @@ export default function RequestsManagement() {
     setIsDeleting(true);
     try {
       const promises = requests.map(req =>
-        fetchWithAuth(`${API_BASE}/requests/${req.id}`, { method: 'DELETE' })
+        fetchWithAuth(`${API_BASE}/api/requests/${req.id}`, { method: 'DELETE' })
 
 
       );

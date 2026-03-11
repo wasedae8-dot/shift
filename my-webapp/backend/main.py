@@ -50,15 +50,6 @@ async def startup_event():
         print(f"ERROR: Failed to initialize/migrate database: {e}")
 
 
-# Allow CORS for all origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 @app.middleware("http")
 async def password_protect(request: Request, call_next):
     # Allow OPTIONS requests for CORS preflight
@@ -70,8 +61,8 @@ async def password_protect(request: Request, call_next):
     
     if app_password:
         app_password = app_password.strip()
-        # Protect everything except basic info and docs
-        if path not in ["/", "/docs", "/openapi.json", "/redoc"]:
+        # Protect everything under /api/ except docs
+        if path.startswith("/api/") and path not in ["/api/auth/diag", "/api/auth/db-diag"]:
             # Check custom header
             request_password = request.headers.get("X-App-Password")
             if request_password:
@@ -83,6 +74,17 @@ async def password_protect(request: Request, call_next):
     
     response = await call_next(request)
     return response
+
+# Allow CORS for all origins. Since we use custom headers and localStorage (not cookies),
+# we don't need allow_credentials=True, which makes Origins="*" work reliably.
+# Added AFTER password_protect so it wraps it and handles early 401 responses.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def read_root():
@@ -112,11 +114,11 @@ def verify_auth(request: Request):
 
 
 # --- Facilities ---
-@app.get("/facilities/", response_model=List[schemas.Facility])
+@app.get("/api/facilities/", response_model=List[schemas.Facility])
 def read_facilities(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return db.query(models.Facility).offset(skip).limit(limit).all()
 
-@app.post("/facilities/", response_model=schemas.Facility)
+@app.post("/api/facilities/", response_model=schemas.Facility)
 def create_facility(facility: schemas.FacilityCreate, db: Session = Depends(get_db)):
     db_facility = models.Facility(name=facility.name)
     db.add(db_facility)
@@ -125,11 +127,11 @@ def create_facility(facility: schemas.FacilityCreate, db: Session = Depends(get_
     return db_facility
 
 # --- Staff ---
-@app.get("/staff/", response_model=List[schemas.Staff])
+@app.get("/api/staff/", response_model=List[schemas.Staff])
 def read_staff(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return db.query(models.Staff).order_by(models.Staff.sort_order, models.Staff.id).offset(skip).limit(limit).all()
 
-@app.post("/staff/", response_model=schemas.Staff)
+@app.post("/api/staff/", response_model=schemas.Staff)
 def create_staff(staff: schemas.StaffCreate, db: Session = Depends(get_db)):
     # Assign next sort_order
     max_order = db.query(models.Staff).count()
@@ -139,14 +141,14 @@ def create_staff(staff: schemas.StaffCreate, db: Session = Depends(get_db)):
     db.refresh(db_staff)
     return db_staff
 
-@app.post("/staff/reorder")
+@app.post("/api/staff/reorder")
 def reorder_staff(ordered_ids: List[int], db: Session = Depends(get_db)):
     for index, staff_id in enumerate(ordered_ids):
         db.query(models.Staff).filter(models.Staff.id == staff_id).update({"sort_order": index})
     db.commit()
     return {"ok": True}
 
-@app.delete("/staff/{staff_id}")
+@app.delete("/api/staff/{staff_id}")
 def delete_staff(staff_id: int, db: Session = Depends(get_db)):
     db_staff = db.query(models.Staff).filter(models.Staff.id == staff_id).first()
     if not db_staff:
@@ -155,7 +157,7 @@ def delete_staff(staff_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True}
 
-@app.put("/staff/{staff_id}", response_model=schemas.Staff)
+@app.put("/api/staff/{staff_id}", response_model=schemas.Staff)
 def update_staff(staff_id: int, staff: schemas.StaffCreate, db: Session = Depends(get_db)):
     db_staff = db.query(models.Staff).filter(models.Staff.id == staff_id).first()
     if not db_staff:
@@ -167,11 +169,11 @@ def update_staff(staff_id: int, staff: schemas.StaffCreate, db: Session = Depend
     return db_staff
 
 # --- Leave Requests ---
-@app.get("/requests/", response_model=List[schemas.LeaveRequest])
+@app.get("/api/requests/", response_model=List[schemas.LeaveRequest])
 def read_requests(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return db.query(models.LeaveRequest).offset(skip).limit(limit).all()
 
-@app.post("/requests/", response_model=schemas.LeaveRequest)
+@app.post("/api/requests/", response_model=schemas.LeaveRequest)
 def create_request(request: schemas.LeaveRequestCreate, db: Session = Depends(get_db)):
     db_request = models.LeaveRequest(**request.dict())
     db.add(db_request)
@@ -179,7 +181,7 @@ def create_request(request: schemas.LeaveRequestCreate, db: Session = Depends(ge
     db.refresh(db_request)
     return db_request
 
-@app.delete("/requests/{request_id}")
+@app.delete("/api/requests/{request_id}")
 def delete_request(request_id: int, db: Session = Depends(get_db)):
     db_request = db.query(models.LeaveRequest).filter(models.LeaveRequest.id == request_id).first()
     if not db_request:
@@ -189,7 +191,7 @@ def delete_request(request_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 # --- Solver Engine ---
-@app.get("/generate-schedule/")
+@app.get("/api/generate-schedule/")
 def generate_schedule(year: int, month: int, db: Session = Depends(get_db)):
     """
     Triggers the OR-Tools optimization engine to generate the schedule 
