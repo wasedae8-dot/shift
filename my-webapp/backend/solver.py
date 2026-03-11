@@ -8,11 +8,12 @@ try:
 except ImportError:
     HAS_JPHOLIDAY = False
 
-def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List[Dict]) -> Dict[str, Any]:
+def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List[Dict], seed: int = 42) -> Dict[str, Any]:
     """
     Generates a shift schedule based on staff skills, monthly calendar constraints, and leave requests.
     """
     model = cp_model.CpModel()
+    rng = random.Random(seed)
     
     # 1. Establish the Calendar
     if month == 12:
@@ -228,16 +229,15 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
         if not staff_list[s].get('is_part_time'):
             for d in operating_days:
                 # Weight 3: each additional shift worked is encouraged, up to target
-                # Plus a random tie-breaker (0-4) so new generations vary when scores tie
-                tie_breaker = random.randint(0, 4)
+                tie_breaker = rng.randint(0, 4)
                 objective_terms.append(shifts[(s, d)] * 30 + (shifts[(s, d)] * tie_breaker))
 
     model.Maximize(sum(objective_terms))
 
     # 8. Solve
     solver = cp_model.CpSolver()
-    # Randomize the search for more variety
-    solver.parameters.random_seed = random.randint(1, 10000)
+    # Randomize the search for more variety using the provided seed
+    solver.parameters.random_seed = seed
     solver.parameters.max_time_in_seconds = 20.0
     status = solver.Solve(model)
 
@@ -324,7 +324,7 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             "status": "success",
             "schedule": schedule_result,
             "summary": staff_summary,
-            "all_staff": {s["id"]: s["name"] for s in staff_list}
+            "all_staff": staff_list
         }
     else:
         return {

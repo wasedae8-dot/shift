@@ -2,8 +2,9 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import os
+import random
 
 import models, schemas
 from database import engine, get_db
@@ -34,15 +35,25 @@ async def startup_event():
             conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0"))
         print("INFO: Migration (sort_order) verified.")
         
-        # Create a default facility if none exists to allow immediate registration
+        # Create default facilities if none exist to match UI options (id: 1, 2)
         from database import SessionLocal
         db = SessionLocal()
         try:
-            if db.query(models.Facility).count() == 0:
-                default_facility = models.Facility(name="デフォルト施設")
-                db.add(default_facility)
-                db.commit()
-                print("INFO: Created default facility.")
+            facility_data = [
+                {"id": 1, "name": "サンケア上池台"},
+                {"id": 2, "name": "サンケア鵜の木"}
+            ]
+            for f_info in facility_data:
+                existing = db.query(models.Facility).filter(models.Facility.id == f_info["id"]).first()
+                if not existing:
+                    new_f = models.Facility(id=f_info["id"], name=f_info["name"])
+                    db.add(new_f)
+                    print(f"INFO: Created facility: {f_info['name']}")
+                else:
+                    if existing.name != f_info["name"]:
+                        existing.name = f_info["name"]
+                        print(f"INFO: Updated facility {f_info['id']} name to: {f_info['name']}")
+            db.commit()
         finally:
             db.close()
             
@@ -57,6 +68,9 @@ async def password_protect(request: Request, call_next):
         return await call_next(request)
         
     app_password = os.getenv("APP_PASSWORD")
+    if not app_password:
+        app_password = "password"
+    
     path = request.url.path
     
     if app_password:
@@ -99,6 +113,9 @@ def verify_auth(request: Request):
     """
     app_password = os.getenv("APP_PASSWORD")
     if not app_password:
+        app_password = "password"
+    
+    if not app_password:
         return {"status": "ok", "warning": "APP_PASSWORD not set"}
         
     app_password = app_password.strip()
@@ -130,8 +147,11 @@ def create_facility(facility: schemas.FacilityCreate, db: Session = Depends(get_
 
 # --- Staff ---
 @app.get("/api/staff/", response_model=List[schemas.Staff])
-def read_staff(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(models.Staff).order_by(models.Staff.sort_order, models.Staff.id).offset(skip).limit(limit).all()
+def read_staff(facility_id: Optional[int] = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    query = db.query(models.Staff)
+    if facility_id:
+        query = query.filter(models.Staff.facility_id == facility_id)
+    return query.order_by(models.Staff.sort_order, models.Staff.id).offset(skip).limit(limit).all()
 
 @app.post("/api/staff/", response_model=schemas.Staff)
 def create_staff(staff: schemas.StaffCreate, db: Session = Depends(get_db)):
@@ -172,8 +192,11 @@ def update_staff(staff_id: int, staff: schemas.StaffCreate, db: Session = Depend
 
 # --- Leave Requests ---
 @app.get("/api/requests/", response_model=List[schemas.LeaveRequest])
-def read_requests(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(models.LeaveRequest).offset(skip).limit(limit).all()
+def read_requests(facility_id: Optional[int] = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    query = db.query(models.LeaveRequest)
+    if facility_id:
+        query = query.join(models.Staff).filter(models.Staff.facility_id == facility_id)
+    return query.offset(skip).limit(limit).all()
 
 @app.post("/api/requests/", response_model=schemas.LeaveRequest)
 def create_request(request: schemas.LeaveRequestCreate, db: Session = Depends(get_db)):
@@ -194,13 +217,22 @@ def delete_request(request_id: int, db: Session = Depends(get_db)):
 
 # --- Solver Engine ---
 @app.get("/api/generate-schedule/")
-def generate_schedule(year: int, month: int, db: Session = Depends(get_db)):
-    """
-    Triggers the OR-Tools optimization engine to generate the schedule 
-    for the specified year and month.
-    """
+def generate_schedule(year: int, month: int, facility_id: int, seed: Optional[int] = None, db: Session = Depends(get_db)):
+    print(f"DEBUG: Generating schedule for year={year}, month={month}, facility_id={facility_id}, seed={seed}")
+    
+    # Use provided seed or generate a random one
+    effective_seed = seed if seed is not None else random.randint(1, 1000000)
+    
     # 1. Fetch current staff properties as dicts for the solver
-    staff_records = db.query(models.Staff).filter(models.Staff.is_active == True).all()
+    staff_records = db.query(models.Staff).filter(
+        models.Staff.is_active == True,
+        models.Staff.facility_id == facility_id
+    ).all()
+    
+    print(f"DEBUG: Found {len(staff_records)} active staff for facility {facility_id}")
+    for s in staff_records:
+        print(f"  - {s.name} (facility_id: {s.facility_id})")
+        
     staff_list = []
     for s in staff_records:
         staff_list.append({
@@ -218,11 +250,14 @@ def generate_schedule(year: int, month: int, db: Session = Depends(get_db)):
             "is_available_thu": s.is_available_thu,
             "is_available_fri": s.is_available_fri,
             "is_available_sat": s.is_available_sat,
-            "is_available_sun": s.is_available_sun
+            "is_available_sun": s.is_available_sun,
+            "sort_order": s.sort_order
         })
         
-    # 2. Fetch leave requests
-    request_records = db.query(models.LeaveRequest).all()
+    # 2. Fetch leave requests for this facility's staff
+    request_records = db.query(models.LeaveRequest).join(models.Staff).filter(
+        models.Staff.facility_id == facility_id
+    ).all()
     requests_list = []
     for r in request_records:
         requests_list.append({
@@ -234,9 +269,11 @@ def generate_schedule(year: int, month: int, db: Session = Depends(get_db)):
         })
         
     # 3. Call the Python OR-Tools Logic
-    result = solve_schedule(year, month, staff_list, requests_list)
+    result = solve_schedule(year, month, staff_list, requests_list, seed=effective_seed)
     
     if result.get("status") == "failed":
         raise HTTPException(status_code=400, detail=result.get("error"))
         
+    # Include the seed used in the response
+    result["seed"] = effective_seed
     return result

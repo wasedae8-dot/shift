@@ -39,7 +39,8 @@ type OptimizationResult = {
   status: string;
   schedule?: DailySchedule[];
   summary?: Record<number, StaffSummary>;
-  all_staff?: Record<number, string>;
+  all_staff?: any[]; // Updated to accept full staff metadata
+  seed?: number;     // Store the seed used for this generation
   error?: string;
 };
 
@@ -47,7 +48,19 @@ export default function Home() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const [scheduleData, setScheduleData] = useState<OptimizationResult | null>(null);
+
+  useEffect(() => {
+    const facilityId = localStorage.getItem('selected_facility_id');
+    setSelectedFacilityId(facilityId);
+    
+    const handleStorage = () => {
+      setSelectedFacilityId(localStorage.getItem('selected_facility_id'));
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   const daysInMonth = getDaysInMonth(new Date(year, month - 1));
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -55,7 +68,9 @@ export default function Home() {
   const handleGenerate = async () => {
     setIsGenerating(true);
     setScheduleData(null);
+    const facilityId = selectedFacilityId || localStorage.getItem('selected_facility_id');
     try {
+      // fetchWithAuth will handle injection of facility_id query param
       const response = await fetchWithAuth(`${API_BASE}/api/generate-schedule/?year=${year}&month=${month}`);
 
       if (!response.ok) {
@@ -101,34 +116,23 @@ export default function Home() {
 
   // Extract all unique staff from the schedule or all_staff mapping
   const allStaff = useMemo(() => {
-    if (scheduleData?.all_staff) {
-      return Object.entries(scheduleData.all_staff)
-        .map(([id, name]: [string, string]) => ({ id: Number(id), name }))
-        .sort((a: {id: number}, b: {id: number}) => a.id - b.id);
-
+    if (scheduleData?.all_staff && Array.isArray(scheduleData.all_staff)) {
+      return [...scheduleData.all_staff]
+        .sort((a, b) => (a.sort_order - b.sort_order) || (a.id - b.id));
     }
     
-    // Fallback to extraction from schedule if all_staff isn't present
+    // Fallback to extraction from schedule if all_staff info isn't present
     if (!scheduleData?.schedule) return [];
-    const staffMap = new Map<number, string>();
+    const staffMap = new Map<number, {id: number, name: string, sort_order: number}>();
     scheduleData.schedule.forEach(day => {
       day.staff.forEach((s: StaffAssignment) => {
         if (!staffMap.has(s.staff_id)) {
-          staffMap.set(s.staff_id, s.name);
+          staffMap.set(s.staff_id, { id: s.staff_id, name: s.name, sort_order: 999 });
         }
       });
-      day.absences?.forEach((a: Absence) => {
-
-         if (!staffMap.has(a.staff_id)) {
-           // We don't have the name here, so we'd need another source
-           staffMap.set(a.staff_id, `Staff ${a.staff_id}`);
-         }
-      });
     });
-    return Array.from(staffMap.entries())
-      .map(([id, name]: [number, string]) => ({ id, name }))
-      .sort((a: {id: number}, b: {id: number}) => a.id - b.id);
-
+    return Array.from(staffMap.values())
+      .sort((a, b) => (a.sort_order - b.sort_order) || (a.id - b.id));
   }, [scheduleData]);
 
   const renderRoleBadge = (role: Role) => {
@@ -137,7 +141,7 @@ export default function Home() {
       case 'consultant': return <span className="inline-flex w-5 h-5 items-center justify-center bg-blue-100 text-blue-700 font-bold text-xs rounded-full shadow-sm">相</span>;
       case 'care': return <span className="inline-flex w-5 h-5 items-center justify-center bg-orange-100 text-orange-700 font-bold text-xs rounded-full shadow-sm">介</span>;
       case 'instructor': return <span className="inline-flex w-5 h-5 items-center justify-center bg-teal-100 text-teal-700 font-bold text-xs rounded-full shadow-sm">機</span>;
-      case 'driver': return <span className="inline-flex w-5 h-5 items-center justify-center bg-slate-100 text-slate-600 font-bold text-[10px] rounded-full shadow-sm">車</span>;
+      case 'driver': return <span className="inline-flex w-5 h-5 items-center justify-center bg-slate-100 text-slate-800 font-black text-[12px] rounded border border-slate-300 shadow-sm">車</span>;
       default: return null;
     }
   };
@@ -171,9 +175,9 @@ export default function Home() {
     
     // Add BOM for Excel compatibility
     const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-    let csvContent = `氏名 / 日付,${daysArray.map(d => `${d}日`).join(',')},出勤,公休,有休\n`;
+    let csvContent = `氏名 / 日付,${daysArray.map(d => `${d}日`).join(',')},出勤,公休,有休\r\n`;
     
-    allStaff.forEach((staff: { id: number; name: string }) => {
+    allStaff.forEach((staff: any) => {
       let rowContent = `"${staff.name}",`;
       const summary = scheduleData.summary?.[staff.id] || { work_days: 0, public_holidays: 0, paid_leaves: 0 };
       
@@ -187,11 +191,7 @@ export default function Home() {
         
         if (assignment) {
           const rMap: Record<string, string> = { 'nurse': '看', 'consultant': '相', 'care': '介', 'instructor': '機', 'driver': '車' };
-          let activeRoles = assignment.roles;
-          if (activeRoles.includes('driver') && activeRoles.length > 1) {
-            activeRoles = activeRoles.filter((r: string) => r !== 'driver');
-          }
-          return activeRoles.map((r: string) => rMap[r] || r).join('/');
+          return assignment.roles.map((r: string) => rMap[r] || r).join('/');
         } else if (absence) {
           return absence.reason;
         } else {
@@ -199,7 +199,7 @@ export default function Home() {
         }
       });
       
-      rowContent += dayCells.join(',') + `,${summary.work_days},${summary.public_holidays},${summary.paid_leaves}\n`;
+      rowContent += dayCells.join(',') + `,${summary.work_days},${summary.public_holidays},${summary.paid_leaves}\r\n`;
       csvContent += rowContent;
     });
     
@@ -218,9 +218,12 @@ export default function Home() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 tracking-tight">
-            シフト表 ({year}年{month}月)
+            シフト表 ({typeof window !== 'undefined' ? (localStorage.getItem('selected_facility_id') === '1' ? 'サンケア上池台' : 'サンケア鵜の木') : ''})
           </h1>
-          <p className="text-neutral-500 mt-1 font-medium">AI最適化エンジン搭載</p>
+          <p className="text-neutral-500 mt-1 font-medium">
+            {year}年{month}月 - AI最適化エンジン搭載 
+            {scheduleData?.seed && <span className="ml-4 text-[10px] opacity-30">Seed: {scheduleData.seed}</span>}
+          </p>
         </div>
         
         <div className="flex items-center gap-4 bg-white p-2 rounded-xl shadow-sm border border-neutral-200">
@@ -360,12 +363,6 @@ export default function Home() {
                       ) : assignment && assignment.roles.length > 0 ? (
                         <div className="flex flex-col gap-0.5 items-center justify-center w-full h-full py-0.5">
                           {assignment.roles
-                            .filter(r => {
-                              // If they have other roles (like care), hide the driver badge to keep it clean.
-                              // Only show 'driver' badge if they have NO other roles.
-                              if (r === 'driver' && assignment.roles.length > 1) return false;
-                              return true;
-                            })
                             .map((r: Role, i: number) => (
                               <div key={i}>{renderRoleBadge(r)}</div>
                             ))}

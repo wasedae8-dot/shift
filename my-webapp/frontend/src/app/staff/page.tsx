@@ -46,10 +46,17 @@ type FormState = {
   is_available_sun: boolean;
 };
 
+const getCurrentFacilityId = () => {
+  if (typeof window !== 'undefined') {
+    return parseInt(localStorage.getItem('selected_facility_id') || '1');
+  }
+  return 1;
+};
+
 const defaultForm = (): FormState => ({
   name: '',
   is_part_time: false,
-  facility_id: 1,
+  facility_id: getCurrentFacilityId(),
   is_nurse: false,
   is_consultant: false,
   is_care_worker: false,
@@ -124,14 +131,10 @@ function StaffFormFields({ form, onChange }: {
         </div>
         <div>
           <label className="block text-sm font-medium text-neutral-600 mb-1">所属施設</label>
-          <select
-            className="w-full px-4 py-2 bg-neutral-50 text-neutral-900 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-            value={form.facility_id}
-            onChange={(e) => onChange({ facility_id: parseInt(e.target.value) })}
-          >
-            <option value={1}>サンケア上池台</option>
-            <option value={2}>サンケア鵜の木</option>
-          </select>
+          <div className="px-4 py-2 bg-neutral-100 text-neutral-500 border border-neutral-200 rounded-lg font-medium">
+            {form.facility_id === 1 ? 'サンケア上池台' : 'サンケア鵜の木'}
+          </div>
+          <p className="mt-1 text-[10px] text-neutral-400">※サイドバーで変更可能です</p>
         </div>
       </div>
 
@@ -184,6 +187,7 @@ function StaffFormFields({ form, onChange }: {
 export default function StaffManagement() {
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(defaultForm());
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [editForm, setEditForm] = useState<FormState>(defaultForm());
@@ -193,9 +197,28 @@ export default function StaffManagement() {
   const dragIndexRef = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+  useEffect(() => {
+    const facilityId = localStorage.getItem('selected_facility_id');
+    setSelectedFacilityId(facilityId);
+    if (facilityId) {
+        setForm(prev => ({ ...prev, facility_id: parseInt(facilityId) }));
+    }
+
+    const handleStorage = () => {
+        const newId = localStorage.getItem('selected_facility_id');
+        setSelectedFacilityId(newId);
+        if (newId) {
+            setForm(prev => ({ ...prev, facility_id: parseInt(newId) }));
+        }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   const fetchStaff = async () => {
     setIsLoading(true);
     try {
+      // fetchWithAuth will automatically append facility_id if present in localStorage
       const response = await fetchWithAuth(`${API_BASE}/api/staff/`);
       if (response.ok) {
         const data = await response.json();
@@ -210,7 +233,7 @@ export default function StaffManagement() {
     }
   };
 
-  useEffect(() => { fetchStaff(); }, []);
+  useEffect(() => { fetchStaff(); }, [selectedFacilityId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
