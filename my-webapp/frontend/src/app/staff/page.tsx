@@ -292,7 +292,7 @@ export default function StaffManagement() {
       }),
     };
     try {
-      const response = await fetchWithAuth(`${API_BASE}/staff/${editingStaff.id}`, {
+      const response = await fetchWithAuth(`${API_BASE}/api/staff/${editingStaff.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -338,7 +338,7 @@ export default function StaffManagement() {
     // Persist to backend
     const orderedIds = newList.map(s => s.id);
     try {
-      await fetchWithAuth(`${API_BASE}/staff/reorder`, {
+      await fetchWithAuth(`${API_BASE}/api/staff/reorder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderedIds),

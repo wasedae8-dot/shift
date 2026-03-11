@@ -69,7 +69,9 @@ async def password_protect(request: Request, call_next):
                 request_password = request_password.strip()
             
             if request_password != app_password:
-                return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+                response = JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+                response.headers["Access-Control-Allow-Origin"] = "*"
+                return response
 
     
     response = await call_next(request)
