@@ -39,9 +39,9 @@ export default function LoginPage() {
       } else {
         setError('パスワードが正しくありません');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login error:', err);
-      setError('サーバーとの通信に失敗しました。時間をおいて再度お試しください。');
+      setError(`サーバーとの通信に失敗しました (Target: ${API_BASE}). Error: ${err.message || 'Unknown error'}`);
     }
   };
 
