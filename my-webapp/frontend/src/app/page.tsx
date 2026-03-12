@@ -50,7 +50,12 @@ type OptimizationResult = {
   all_staff?: any[]; // Updated to accept full staff metadata
   seed?: number;     // Store the seed used for this generation
   error?: string;
-  violations?: { staff_name: string; date: string }[];
+  violations?: { 
+    type: 'leave' | 'workday_excess';
+    staff_name: string; 
+    date?: string; 
+    excess_days?: number 
+  }[];
 };
 
 export default function Home() {
@@ -371,17 +376,41 @@ export default function Home() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <div>
-            <h3 className="text-lg font-bold mb-1">【重要】一部の休み希望を叶えることができませんでした</h3>
-            <p className="font-medium text-orange-700/80 mb-2">
-              人員不足や制約の重複により、以下のスタッフの休み希望日に出勤が割り当てられています。内容を確認し、必要に応じて手動で調整してください。
+            <h3 className="text-lg font-bold mb-1">【重要】一部の制約（休み希望・公休日数）を叶えることができませんでした</h3>
+            <p className="font-medium text-orange-700/80 mb-3">
+              人員不足や制約の重複が原因です。内容を確認し、必要に応じて手動で調整してください。
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1">
-              {scheduleData.violations.map((v, i) => (
-                <div key={i} className="text-sm font-bold flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-                  {v.staff_name} さん ({parseInt(v.date.split('-')[2])}日)
+            
+            <div className="space-y-3">
+              {/* Leave violations */}
+              {scheduleData.violations.some(v => v.type === 'leave') && (
+                <div>
+                  <h4 className="text-xs font-black text-orange-600 uppercase tracking-wider mb-1">休み希望の未達成</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-sm font-bold">
+                    {scheduleData.violations.filter(v => v.type === 'leave').map((v, i) => (
+                      <div key={`leave-${i}`} className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+                        {v.staff_name} さん ({v.date ? parseInt(v.date.split('-')[2]) : ''}日)
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              )}
+
+              {/* Workday excess violations */}
+              {scheduleData.violations.some(v => v.type === 'workday_excess') && (
+                <div>
+                  <h4 className="text-xs font-black text-orange-600 uppercase tracking-wider mb-1">公休の不足（出勤過多）</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-sm font-bold">
+                    {scheduleData.violations.filter(v => v.type === 'workday_excess').map((v, i) => (
+                      <div key={`excess-${i}`} className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                        {v.staff_name} さん (公休 {v.excess_days}日不足)
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

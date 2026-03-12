@@ -246,9 +246,9 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             # Penalize missing total headcount less than specific roles, but more than leveling
             objective_terms.append(hc_shortage * -500000)
 
-    # 4. Monthly Workday Targets
     # For full-timers: target = num_days - (Sat+Sun+holiday) - paid_leave_days
     staff_targets = {}  # index -> target_work_days
+    target_excess_vars = {} # index -> excess_var
     for s in range(num_staff):
         staff_data = staff_list[s]
         
@@ -276,6 +276,7 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             excess = model.NewIntVar(0, num_days, f'staff_target_excess_s{s}')
             model.Add(actual_work_days - excess <= target_work_days)
             objective_terms.append(excess * -5000)
+            target_excess_vars[s] = excess
 
     # 5. Leave Requests (Soft Constraints with Very High Penalty)
     violation_vars = {} # (s_idx, d) -> bool_var
@@ -416,8 +417,19 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
                 s_data = staff_list[s_idx]
                 req_date = f"{year}-{month:02d}-{d:02d}"
                 violations.append({
+                    "type": "leave",
                     "staff_name": s_data['name'],
                     "date": req_date
+                })
+
+        for s_idx, e_var in target_excess_vars.items():
+            excess_val = solver.Value(e_var)
+            if excess_val > 0:
+                s_data = staff_list[s_idx]
+                violations.append({
+                    "type": "workday_excess",
+                    "staff_name": s_data['name'],
+                    "excess_days": excess_val
                 })
 
         schedule_result = []
