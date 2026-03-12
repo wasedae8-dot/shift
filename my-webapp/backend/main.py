@@ -68,14 +68,15 @@ async def password_protect(request: Request, call_next):
         return await call_next(request)
         
     app_password = os.getenv("APP_PASSWORD")
+    if not app_password:
+        app_password = "password"
     
     path = request.url.path
     
-    # If app_password is not set or empty, disable protection
-    if app_password and app_password.strip():
+    if app_password:
         app_password = app_password.strip()
-        # Protect everything under /api/ except specific diag routes
-        if path.startswith("/api/") and path not in ["/api/auth/diag", "/api/auth/verify"]:
+        # Protect everything under /api/ except docs
+        if path.startswith("/api/") and path not in ["/api/auth/diag", "/api/auth/db-diag"]:
             # Check custom header
             request_password = request.headers.get("X-App-Password")
             if request_password:
@@ -86,15 +87,36 @@ async def password_protect(request: Request, call_next):
                 response.headers["Access-Control-Allow-Origin"] = "*"
                 return response
 
-    return await call_next(request)
+    
+    response = await call_next(request)
+    return response
 
-# ... CORS middleware ...
+# Allow CORS for all origins. Since we use custom headers and localStorage (not cookies),
+# we don't need allow_credentials=True, which makes Origins="*" work reliably.
+# Added AFTER password_protect so it wraps it and handles early 401 responses.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def read_root():
+    return {"message": "Shift Scheduling Optimization API is running."}
 
 @app.get("/api/auth/verify")
 def verify_auth(request: Request):
+    """
+    Endpoint for the frontend to verify if the password is correct.
+    """
     app_password = os.getenv("APP_PASSWORD")
-    if not app_password or not app_password.strip():
-        return {"status": "ok", "auth_required": False}
+    if not app_password:
+        app_password = "password"
+    
+    if not app_password:
+        return {"status": "ok", "warning": "APP_PASSWORD not set"}
         
     app_password = app_password.strip()
     request_password = request.headers.get("X-App-Password", "").strip()
@@ -102,40 +124,7 @@ def verify_auth(request: Request):
     if request_password != app_password:
         raise HTTPException(status_code=401, detail="Unauthorized")
         
-    return {"status": "ok", "auth_required": True}
-    
-@app.get("/api/auth/diag")
-def diagnostic():
-    try:
-        import jpholiday
-        import datetime
-        import solver
-        
-        # Test specific date
-        test_date = datetime.date(2026, 5, 4)
-        is_h = jpholiday.is_holiday(test_date)
-        
-        # Get all holidays for May 2026
-        may_holidays = jpholiday.month_holidays(2026, 5)
-        
-        return {
-            "jpholiday_installed": True,
-            "solver_HAS_JPHOLIDAY": solver.HAS_JPHOLIDAY,
-            "test_2026_05_04_is_holiday": is_h,
-            "may_2026_holidays": [str(h[0]) + ": " + h[1] for h in may_holidays],
-            "python_version": os.popen("python --version").read().strip(),
-            "server_time": datetime.datetime.now().isoformat()
-        }
-    except ImportError:
-        return {
-            "jpholiday_installed": False,
-            "error": "ImportError"
-        }
-    except Exception as e:
-        return {
-            "jpholiday_installed": True,
-            "error": str(e)
-        }
+    return {"status": "ok"}
 
 
 

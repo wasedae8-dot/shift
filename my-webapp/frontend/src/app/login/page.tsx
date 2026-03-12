@@ -7,29 +7,7 @@ import API_BASE from '../api';
 export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-
-  // Check if auth is required on mount
-  useState(() => {
-    const checkAuthRequirement = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/auth/verify`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.auth_required === false) {
-            console.log('DEBUG: Auth not required, redirecting...');
-            const returnTo = sessionStorage.getItem('return_to');
-            sessionStorage.removeItem('return_to');
-            router.push(returnTo || '/');
-          }
-        }
-      } catch (e) {
-        console.warn('Auth check failed:', e);
-      }
-    };
-    checkAuthRequirement();
-  });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +16,11 @@ export default function LoginPage() {
       return;
     }
 
-    setIsLoading(true);
-    setError('');
+    
+    console.log(`DEBUG: Attempting login to ${API_BASE}/api/auth/verify`);
+    
+    // Check if API_BASE is likely wrong (localhost in production)
+    const isLocalhost = API_BASE.includes('localhost') || API_BASE.includes('127.0.0.1');
     
     try {
       const response = await fetch(`${API_BASE}/api/auth/verify`, {
@@ -48,18 +29,19 @@ export default function LoginPage() {
         }
       });
 
+      console.log(`DEBUG: Response status: ${response.status}`);
+
       if (response.ok) {
+        console.log('DEBUG: Login successful');
         localStorage.setItem('app_password', password);
-        const returnTo = sessionStorage.getItem('return_to');
-        sessionStorage.removeItem('return_to');
-        router.push(returnTo || '/');
+        router.push('/');
+        router.refresh();
       } else {
         setError('パスワードが正しくありません');
       }
     } catch (err) {
-      setError('サーバーとの通信に失敗しました。');
-    } finally {
-      setIsLoading(false);
+      console.error('Login error:', err);
+      setError('サーバーとの通信に失敗しました。時間をおいて再度お試しください。');
     }
   };
 

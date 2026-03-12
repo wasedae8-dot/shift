@@ -24,10 +24,6 @@ export default function RootLayout({
 
       if (!password) {
         if (pathname !== '/login') {
-          // Save current path to return after login
-          if (typeof window !== 'undefined') {
-             sessionStorage.setItem('return_to', pathname + window.location.search);
-          }
           setIsAuthenticated(false);
           router.push('/login');
         } else {
@@ -37,7 +33,7 @@ export default function RootLayout({
       }
 
       // If password exists, check facility selection
-      if (!facilityId && pathname !== '/facility' && pathname !== '/login' && pathname !== '/settings') {
+      if (!facilityId && pathname !== '/facility' && pathname !== '/login') {
         router.push('/facility');
         return;
       }
@@ -50,27 +46,14 @@ export default function RootLayout({
         if (response.ok) {
           setIsAuthenticated(true);
           if (pathname === '/login') {
-             // After login, handle redirection
-             const returnTo = typeof window !== 'undefined' ? sessionStorage.getItem('return_to') : null;
-             if (returnTo) sessionStorage.removeItem('return_to');
-             
-             if (returnTo && returnTo !== '/login') {
-               router.push(returnTo);
-             } else if (!facilityId) {
-               router.push('/facility');
-             } else {
-               router.push('/');
-             }
+             // After login, if no facility selected, go to select, otherwise go home
+             if (!facilityId) router.push('/facility');
+             else router.push('/');
           }
         } else {
           localStorage.removeItem('app_password');
           setIsAuthenticated(false);
-          if (pathname !== '/login') {
-            if (typeof window !== 'undefined') {
-              sessionStorage.setItem('return_to', pathname + window.location.search);
-            }
-            router.push('/login');
-          }
+          router.push('/login');
         }
       } catch (err) {
         console.error("Auth verification error:", err);
