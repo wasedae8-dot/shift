@@ -294,30 +294,55 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
     
     for d in operating_days:
         daily_headcount = sum(shifts[(s, d)] for s in range(num_staff))
-        
-        # Penalize exceeding the soft upper limit
-        # This discourages the 18-person days noticed by the user
-        is_over_limit = model.NewBoolVar(f'over_limit_d{d}')
-        model.Add(daily_headcount > soft_upper_limit).OnlyEnforceIf(is_over_limit)
-        model.Add(daily_headcount <= soft_upper_limit).OnlyEnforceIf(is_over_limit.Not())
-        
-        # Priority days should NOT be penalized for being over the limit (within reason)
         day_info = constraint_lookup.get(d, {})
-        if not day_info.get('is_priority'):
-            # Reward staying exactly at or very close to soft limit
-            # Deviation penalty: 200 (high) for each person away from target
-            # Actually, let's use a two-tier approach:
-            # 1. Stay under/near limit
-            # 2. Discourage being TOO low (e.g. 12 if avg is 14)
+        
+        # If priority day, our "target" is the higher value
+        target_for_day = soft_upper_limit
+        if day_info.get('is_priority'):
+            target_for_day = max(soft_upper_limit, min_headcount + 3)
             
-            # Penalize being below avg-1
-            is_too_low = model.NewBoolVar(f'too_low_d{d}')
-            model.Add(daily_headcount < soft_upper_limit - 1).OnlyEnforceIf(is_too_low)
-            model.Add(daily_headcount >= soft_upper_limit - 1).OnlyEnforceIf(is_too_low.Not())
-            objective_terms.append(is_too_low.Not() * 100) # Reward NOT being too low
-            
-            # Penalize being over limit
-            objective_terms.append(is_over_limit.Not() * 100) # Reward NOT being too high
+        # Multi-tiered Deviation Penalty
+        # We penalize absolute difference from target_for_day
+        # diff1: |hc - target| >= 1
+        # diff2: |hc - target| >= 2
+        # diff3: |hc - target| >= 3
+        
+        diff1_plus = model.NewBoolVar(f'diff1_p_d{d}')
+        diff1_minus = model.NewBoolVar(f'diff1_m_d{d}')
+        diff2_plus = model.NewBoolVar(f'diff2_p_d{d}')
+        diff2_minus = model.NewBoolVar(f'diff2_m_d{d}')
+        diff3_plus = model.NewBoolVar(f'diff3_p_d{d}')
+        diff3_minus = model.NewBoolVar(f'diff3_m_d{d}')
+        
+        model.Add(daily_headcount >= target_for_day + 1).OnlyEnforceIf(diff1_plus)
+        model.Add(daily_headcount < target_for_day + 1).OnlyEnforceIf(diff1_plus.Not())
+        
+        model.Add(daily_headcount <= target_for_day - 1).OnlyEnforceIf(diff1_minus)
+        model.Add(daily_headcount > target_for_day - 1).OnlyEnforceIf(diff1_minus.Not())
+        
+        model.Add(daily_headcount >= target_for_day + 2).OnlyEnforceIf(diff2_plus)
+        model.Add(daily_headcount < target_for_day + 2).OnlyEnforceIf(diff2_plus.Not())
+        
+        model.Add(daily_headcount <= target_for_day - 2).OnlyEnforceIf(diff2_minus)
+        model.Add(daily_headcount > target_for_day - 2).OnlyEnforceIf(diff2_minus.Not())
+        
+        model.Add(daily_headcount >= target_for_day + 3).OnlyEnforceIf(diff3_plus)
+        model.Add(daily_headcount < target_for_day + 3).OnlyEnforceIf(diff3_plus.Not())
+        
+        model.Add(daily_headcount <= target_for_day - 3).OnlyEnforceIf(diff3_minus)
+        model.Add(daily_headcount > target_for_day - 3).OnlyEnforceIf(diff3_minus.Not())
+        
+        # Penalties (expressed as negative rewards for Maximize)
+        # diff1 is 300: outweighs leave request (200)
+        # diff2 is 1000: extremely high
+        # diff3 is 5000: almost hard constraint
+        
+        objective_terms.append(diff1_plus.Not() * 300)
+        objective_terms.append(diff1_minus.Not() * 300)
+        objective_terms.append(diff2_plus.Not() * 1000)
+        objective_terms.append(diff2_minus.Not() * 1000)
+        objective_terms.append(diff3_plus.Not() * 5000)
+        objective_terms.append(diff3_minus.Not() * 5000)
 
         # Tie breaker / Individual targets
         for s in range(num_staff):
