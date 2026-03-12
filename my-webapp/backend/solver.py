@@ -191,6 +191,8 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
     objective_terms = []
     # Penalties for missing required roles (very high to prioritize compliance)
     W_MISSING_ROLE = 1000000 
+    # Penalty for violating leave requests (highest priority among soft constraints)
+    W_LEAVE_REQUEST = 3000000
 
     # 3. Facility Requirements (Hard Constraints per Day)
     for d in operating_days:
@@ -275,7 +277,8 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             model.Add(actual_work_days - excess <= target_work_days)
             objective_terms.append(excess * -5000)
 
-    # 5. Leave Requests (Hard Constraints)
+    # 5. Leave Requests (Soft Constraints with Very High Penalty)
+    violation_vars = {} # (s_idx, d) -> bool_var
     for req in requests:
         req_date = datetime.datetime.strptime(req['date'], "%Y-%m-%d").date()
         if req_date.year == year and req_date.month == month:
@@ -284,8 +287,11 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             s_idx = next((i for i, v in enumerate(staff_list) if v['id'] == staff_id), -1)
             
             if s_idx != -1 and d in operating_days:
-                # Hope is now an absolute hard constraint again to eliminate negotiation burden
-                model.Add(shifts[(s_idx, d)] == 0)
+                # Violation variable: 1 if shift is 1 (staff works) even though they requested leave (0)
+                v_var = model.NewBoolVar(f'leave_violation_s{s_idx}_d{d}')
+                model.Add(v_var == shifts[(s_idx, d)])
+                objective_terms.append(v_var * -W_LEAVE_REQUEST)
+                violation_vars[(s_idx, d)] = v_var
 
     # 6. No 5 consecutive workdays (Soft Constraint - penalty-based)
     # Add penalty when 5 consecutive days are all worked
@@ -403,6 +409,17 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
     status = solver.Solve(model)
 
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+        # Check violations
+        violations = []
+        for (s_idx, d), v_var in violation_vars.items():
+            if solver.Value(v_var):
+                s_data = staff_list[s_idx]
+                req_date = f"{year}-{month:02d}-{d:02d}"
+                violations.append({
+                    "staff_name": s_data['name'],
+                    "date": req_date
+                })
+
         schedule_result = []
         for d in range(1, num_days + 1):
             daily_schedule = {
@@ -492,7 +509,8 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             "status": "success",
             "schedule": schedule_result,
             "summary": staff_summary,
-            "all_staff": staff_list
+            "all_staff": staff_list,
+            "violations": violations
         }
     else:
         return {

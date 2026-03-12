@@ -50,6 +50,7 @@ type OptimizationResult = {
   all_staff?: any[]; // Updated to accept full staff metadata
   seed?: number;     // Store the seed used for this generation
   error?: string;
+  violations?: { staff_name: string; date: string }[];
 };
 
 export default function Home() {
@@ -360,6 +361,28 @@ export default function Home() {
           <div>
             <h3 className="text-lg font-bold mb-1">シフト作成エラー</h3>
             <p className="font-medium text-red-700/80">{scheduleData.error}</p>
+          </div>
+        </div>
+      )}
+
+      {scheduleData && scheduleData.violations && scheduleData.violations.length > 0 && (
+        <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl text-orange-800 shadow-sm flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+          <svg className="w-6 h-6 text-orange-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div>
+            <h3 className="text-lg font-bold mb-1">【重要】一部の休み希望を叶えることができませんでした</h3>
+            <p className="font-medium text-orange-700/80 mb-2">
+              人員不足や制約の重複により、以下のスタッフの休み希望日に出勤が割り当てられています。内容を確認し、必要に応じて手動で調整してください。
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1">
+              {scheduleData.violations.map((v, i) => (
+                <div key={i} className="text-sm font-bold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+                  {v.staff_name} さん ({parseInt(v.date.split('-')[2])}日)
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
