@@ -239,6 +239,8 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             model.Add(sum(shifts[(s, d)] for d in operating_days) <= target_work_days)
 
     # 5. Leave Requests (Soft Constraints → Objective terms)
+    # We now treat them as negotiable if needed for balancing.
+    # Summer vacation is still extremely high penalty.
     objective_terms = []
     
     for req in requests:
@@ -249,10 +251,14 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             s_idx = next((i for i, v in enumerate(staff_list) if v['id'] == staff_id), -1)
             
             if s_idx != -1 and d in operating_days:
+                # If they DONT work, it's a reward (meeting the leave request)
                 if req.get('is_summer_vacation'):
-                    objective_terms.append(shifts[(s_idx, d)].Not() * 100)
+                    # Summer is priority 1
+                    objective_terms.append(shifts[(s_idx, d)].Not() * 1000)
                 else:
-                    objective_terms.append(shifts[(s_idx, d)].Not() * 10)
+                    # Normal leave request is priority 2
+                    # Weight 200: higher than balancing to keep them off when possible
+                    objective_terms.append(shifts[(s_idx, d)].Not() * 200)
 
     # 6. No 5 consecutive workdays (Soft Constraint - penalty-based)
     # Add penalty when 5 consecutive days are all worked
@@ -298,7 +304,20 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
         # Priority days should NOT be penalized for being over the limit (within reason)
         day_info = constraint_lookup.get(d, {})
         if not day_info.get('is_priority'):
-            objective_terms.append(is_over_limit.Not() * 20) # Reward staying under the soft limit
+            # Reward staying exactly at or very close to soft limit
+            # Deviation penalty: 200 (high) for each person away from target
+            # Actually, let's use a two-tier approach:
+            # 1. Stay under/near limit
+            # 2. Discourage being TOO low (e.g. 12 if avg is 14)
+            
+            # Penalize being below avg-1
+            is_too_low = model.NewBoolVar(f'too_low_d{d}')
+            model.Add(daily_headcount < soft_upper_limit - 1).OnlyEnforceIf(is_too_low)
+            model.Add(daily_headcount >= soft_upper_limit - 1).OnlyEnforceIf(is_too_low.Not())
+            objective_terms.append(is_too_low.Not() * 100) # Reward NOT being too low
+            
+            # Penalize being over limit
+            objective_terms.append(is_over_limit.Not() * 100) # Reward NOT being too high
 
         # Tie breaker / Individual targets
         for s in range(num_staff):
@@ -337,7 +356,8 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
                             "staff_id": staff_list[s]["id"],
                             "name": staff_list[s]["name"],
                             "roles": assigned_roles,
-                            "is_driver": bool(staff_list[s].get('is_driver', False))
+                            "is_driver": bool(staff_list[s].get('is_driver', False)),
+                            "was_requested_leave": (staff_list[s]["id"], d) in leave_request_days
                         })
                         working_staff_ids.add(staff_list[s]["id"])
 
