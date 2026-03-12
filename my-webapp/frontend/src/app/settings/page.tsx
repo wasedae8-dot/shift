@@ -83,6 +83,21 @@ export default function SettingsPage() {
     });
   };
 
+  const handleReset = () => {
+    if (!settings) return;
+    if (!confirm('詳細パラメータを標準の初期値に戻しますか？')) return;
+    
+    // Standard defaults (Mid preset values)
+    setSettings({
+      ...settings,
+      weight_leveling_low: 2000,
+      weight_leveling_mid: 8000,
+      weight_leveling_high: 25000,
+      base_shift_reward: 2
+    });
+    setMessage({ type: 'success', text: '標準値にリセットしました（保存ボタンを押すと確定します）' });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -175,7 +190,16 @@ export default function SettingsPage() {
 
           <div className="space-y-6 pt-6 border-t border-dashed border-neutral-100">
             <div>
-              <h3 className="text-sm font-bold text-neutral-700 mb-4">詳細パラメータ（上級者向け）</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-bold text-neutral-700">詳細パラメータ（上級者向け）</h3>
+                <button 
+                  onClick={handleReset}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 px-2 py-1 bg-indigo-50 rounded hover:bg-indigo-100 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.233 8.5M21 9v1m-2-2v2" /></svg>
+                  初期値に戻す
+                </button>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">平準化ペナルティの設定</label>
