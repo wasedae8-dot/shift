@@ -34,7 +34,8 @@ async def startup_event():
         from sqlalchemy import text
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0"))
-        print("INFO: Migration (sort_order) verified.")
+            conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS work_hours INTEGER NOT NULL DEFAULT 8"))
+        print("INFO: Migration (sort_order, work_hours) verified.")
         
         # Create default facilities if none exist to match UI options (id: 1, 2)
         from database import SessionLocal
@@ -351,7 +352,8 @@ def generate_schedule(year: int, month: int, facility_id: int, seed: Optional[in
             "is_available_fri": s.is_available_fri,
             "is_available_sat": s.is_available_sat,
             "is_available_sun": s.is_available_sun,
-            "sort_order": s.sort_order
+            "sort_order": s.sort_order,
+            "work_hours": s.work_hours
         })
         
     # 2. Fetch leave requests for this facility's staff

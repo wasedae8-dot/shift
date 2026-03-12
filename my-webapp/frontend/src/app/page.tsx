@@ -257,19 +257,24 @@ export default function Home() {
       const summary = scheduleData.summary?.[staff.id] || { work_days: 0, public_holidays: 0, paid_leaves: 0 };
       
       const dayCells = daysArray.map(day => {
+        const d = new Date(year, month - 1, day);
         const daySchedule = scheduleData.schedule?.find((ds: DailySchedule) => ds.day === day);
         if (!daySchedule) return '';
-        if (daySchedule.is_closed) return '-';
         
         const assignment = daySchedule.staff.find((s: StaffAssignment) => s.staff_id === staff.id);
         const absence = daySchedule.absences?.find((a: Absence) => a.staff_id === staff.id);
         
         if (assignment) {
-          const rMap: Record<string, string> = { 'nurse': '看', 'consultant': '相', 'care': '介', 'instructor': '機', 'driver': '車' };
-          return assignment.roles.map((r: string) => rMap[r] || r).join('/');
+          // If staff is working, show their registered work hours
+          return staff.work_hours || 8;
         } else if (absence) {
-          return absence.reason;
+          // Specified symbols for absences
+          if (absence.reason === '有') return '⑧'; // Paid leave
+          if (absence.reason === '公' || absence.reason === '休') return ''; // Public holiday or leave request (blank as requested)
+          return absence.reason; // Others ('夏' etc)
         } else {
+          // Sundays should be blank if not assigned (handled by assignment/absence check, but explicitly blank if it's Sunday)
+          if (d.getDay() === 0) return '';
           return '';
         }
       });

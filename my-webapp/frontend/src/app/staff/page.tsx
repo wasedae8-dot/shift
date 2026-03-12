@@ -18,6 +18,7 @@ type Staff = {
   is_functional_trainer: boolean;
   is_active: boolean;
   sort_order: number;
+  work_hours: number;
   is_available_mon: boolean;
   is_available_tue: boolean;
   is_available_wed: boolean;
@@ -37,6 +38,7 @@ type FormState = {
   is_driver: boolean;
   is_functional_trainer: boolean;
   is_active: boolean;
+  work_hours: number;
   is_available_mon: boolean;
   is_available_tue: boolean;
   is_available_wed: boolean;
@@ -57,6 +59,7 @@ const defaultForm = (): FormState => ({
   name: '',
   is_part_time: false,
   facility_id: getCurrentFacilityId(),
+  work_hours: 8,
   is_nurse: false,
   is_consultant: false,
   is_care_worker: false,
@@ -129,6 +132,23 @@ function StaffFormFields({ form, onChange }: {
             <option value="part">パート（時短・曜日固定）</option>
           </select>
         </div>
+        <div>
+          <label className="block text-sm font-medium text-neutral-600 mb-1">契約時間（1日あたり）</label>
+          <div className="relative">
+            <input
+              type="number"
+              value={form.work_hours}
+              onChange={(e) => onChange({ work_hours: parseInt(e.target.value) || 0 })}
+              className="w-full px-4 py-2 bg-neutral-50 text-neutral-900 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              min="1"
+              max="24"
+            />
+            <span className="absolute right-4 top-2 text-neutral-400 text-sm">時間</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
         <div>
           <label className="block text-sm font-medium text-neutral-600 mb-1">所属施設</label>
           <div className="px-4 py-2 bg-neutral-100 text-neutral-500 border border-neutral-200 rounded-lg font-medium">
@@ -301,6 +321,7 @@ export default function StaffManagement() {
       is_available_fri: staff.is_available_fri,
       is_available_sat: staff.is_available_sat,
       is_available_sun: staff.is_available_sun,
+      work_hours: staff.work_hours,
     });
   };
 
@@ -427,6 +448,7 @@ export default function StaffManagement() {
                   <tr>
                     <th className="px-2 py-4 w-8"></th>
                     <th className="px-4 py-4 font-medium">氏名</th>
+                    <th className="px-4 py-4 font-medium w-24">契約時間</th>
                     <th className="px-4 py-4 font-medium">種別</th>
                     <th className="px-4 py-4 font-medium">資格・業務</th>
                     <th className="px-4 py-4 font-medium">出勤可能曜日</th>
@@ -460,6 +482,9 @@ export default function StaffManagement() {
                         </svg>
                       </td>
                       <td className="px-4 py-4 font-medium text-neutral-900">{staff.name}</td>
+                      <td className="px-4 py-4 text-neutral-600 font-medium">
+                        {staff.work_hours}h
+                      </td>
                       <td className="px-4 py-4">
                         {staff.is_part_time ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">パート</span>

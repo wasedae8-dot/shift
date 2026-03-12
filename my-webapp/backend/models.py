@@ -40,6 +40,7 @@ class Staff(Base):
     # Additional flags
     is_active = Column(Boolean, default=True)
     sort_order = Column(Integer, default=0, nullable=False)
+    work_hours = Column(Integer, default=8, nullable=False)
 
     # Availability for part-time staff (Boolean flags for each day of the week)
     is_available_mon = Column(Boolean, default=True)

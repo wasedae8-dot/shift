@@ -26,6 +26,7 @@ class StaffBase(BaseModel):
     is_functional_trainer: bool = False
     is_active: bool = True
     sort_order: int = 0
+    work_hours: int = 8
     
     # Availability for part-time staff
     is_available_mon: bool = True
