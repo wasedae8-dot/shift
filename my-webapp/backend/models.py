@@ -50,8 +50,6 @@ class Staff(Base):
     is_available_sat = Column(Boolean, default=True)
     is_available_sun = Column(Boolean, default=True)
 
-    leave_requests = relationship("LeaveRequest", back_populates="staff", cascade="all, delete-orphan")
-
 class LeaveRequest(Base):
     __tablename__ = "leave_requests"
 
@@ -61,4 +59,4 @@ class LeaveRequest(Base):
     reason = Column(String, default="希望休") # 休み希望, 夏休み, etc.
     is_summer_vacation = Column(Boolean, default=False)
 
-    staff = relationship("Staff", back_populates="leave_requests")
+    staff = relationship("Staff")

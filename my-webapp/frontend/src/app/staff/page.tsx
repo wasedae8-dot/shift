@@ -274,16 +274,11 @@ export default function StaffManagement() {
     if (!confirm("本当に削除しますか？")) return;
     try {
       const response = await fetchWithAuth(`${API_BASE}/api/staff/${id}`, { method: 'DELETE' });
-      
-      if (response.ok) {
-        fetchStaff();
-      } else {
-        const data = await response.json().catch(() => ({}));
-        alert(`削除に失敗しました: ${data.detail || response.statusText}`);
-      }
+
+
+      if (response.ok) fetchStaff();
     } catch (error) {
       console.error("Error deleting staff:", error);
-      alert("サーバーとの通信に失敗しました。");
     }
   };
 
