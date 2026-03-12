@@ -132,10 +132,10 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
                 if not is_contracted_day:
                     # Cannot work on non-contracted days
                     model.Add(shifts[(s, d)] == 0)
-                elif not has_leave:
-                    # MUST work on contracted days unless they have a leave request
-                    model.Add(shifts[(s, d)] == 1)
-                # else: has leave → allowed to be off
+                # Relaxed: part-timers prefer work on contracted days, but we don't MUST enforce it
+                # if it blocks feasibility. However, usually they WANT to work.
+                # To be safe, we allow them to NOT work if it helps, but reward working.
+                # model.Add(shifts[(s, d)] == 1) -> replaced by reward in objective
             else:
                 # Full-time driver-only staff: must work every operating day unless leave requested
                 is_driver_only = check_is_driver_only(staff_dict)
@@ -255,7 +255,7 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
 
     # 6. No 5 consecutive workdays (Soft Constraint - penalty-based)
     # Add penalty when 5 consecutive days are all worked
-    objective_terms = []
+    # objective_terms is already initialized above now
     for s in range(num_staff):
         staff_data = staff_list[s]
         # Only apply for full-time staff (part-timers only work contracted days anyway)
@@ -345,11 +345,19 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
 
         # Tie breaker / Individual targets
         for s in range(num_staff):
-            if not staff_list[s].get('is_part_time'):
-                tie_breaker = rng.randint(0, 4)
-                # Dynamic base shift reward (default 2)
-                base_reward = settings.get("base_shift_reward", 2)
-                objective_terms.append(shifts[(s, d)] * base_reward + (shifts[(s, d)] * tie_breaker))
+            staff_d = staff_list[s]
+            tie_breaker = rng.randint(0, 4)
+            # Dynamic base shift reward (default 2)
+            base_reward = settings.get("base_shift_reward", 2)
+            
+            # Additional reward for part-timers on their contracted days to encourage participation
+            if staff_d.get('is_part_time'):
+                weekday = datetime.date(year, month, d).weekday()
+                flag = DAY_FLAGS.get(weekday)
+                if flag and staff_d.get(flag):
+                    base_reward += 500 # High reward to make them work contracted days
+            
+            objective_terms.append(shifts[(s, d)] * base_reward + (shifts[(s, d)] * tie_breaker))
 
     model.Maximize(sum(objective_terms))
 
