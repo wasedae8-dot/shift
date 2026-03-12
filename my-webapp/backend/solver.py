@@ -9,21 +9,24 @@ except (ImportError, TypeError):
     # TypeError can occur on Python 3.8 due to jpholiday's modern type hinting
     HAS_JPHOLIDAY = False
 
-def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List[Dict], facility_id: int = 1, seed: int = 42, constraints: List[Dict] = None) -> Dict[str, Any]:
+def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List[Dict], facility_id: int = 1, seed: int = 42, constraints: List[Dict] = None, settings: Dict = None) -> Dict[str, Any]:
     """
     Generates a shift schedule based on staff skills, monthly calendar constraints, leave requests, and daily overrides.
     """
     model = cp_model.CpModel()
     rng = random.Random(seed)
     
-    # Define facility-specific minimum headcount (excluding specialized drivers)
-    # Facility 1 (Ukeigadai): 12-13 -> We use 12 as minimum
-    # Facility 2 (Unoki): 9-10 -> We use 9 as minimum
-    min_headcount = 0
-    if facility_id == 1:
-        min_headcount = 12
-    elif facility_id == 2:
-        min_headcount = 9
+    # Use provided settings or defaults
+    if settings is None:
+        settings = {
+            "min_headcount": 12 if facility_id == 1 else 9,
+            "weight_leveling_low": 2000,
+            "weight_leveling_mid": 8000,
+            "weight_leveling_high": 25000,
+            "base_shift_reward": 2
+        }
+
+    min_headcount = settings.get("min_headcount", 12 if facility_id == 1 else 9)
     
     # 1. Establish the Calendar
     if month == 12:
@@ -329,19 +332,24 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
         # diff2 is now 8000 (was 1000)
         # diff3 is 20000+ (was 5000)
         
-        objective_terms.append(diff1_plus.Not() * 2000)
-        objective_terms.append(diff1_minus.Not() * 2000)
-        objective_terms.append(diff2_plus.Not() * 8000)
-        objective_terms.append(diff2_minus.Not() * 8000)
-        objective_terms.append(diff3_plus.Not() * 25000)
-        objective_terms.append(diff3_minus.Not() * 25000)
+        w_low = settings.get("weight_leveling_low", 2000)
+        w_mid = settings.get("weight_leveling_mid", 8000)
+        w_high = settings.get("weight_leveling_high", 25000)
+
+        objective_terms.append(diff1_plus.Not() * w_low)
+        objective_terms.append(diff1_minus.Not() * w_low)
+        objective_terms.append(diff2_plus.Not() * w_mid)
+        objective_terms.append(diff2_minus.Not() * w_mid)
+        objective_terms.append(diff3_plus.Not() * w_high)
+        objective_terms.append(diff3_minus.Not() * w_high)
 
         # Tie breaker / Individual targets
         for s in range(num_staff):
             if not staff_list[s].get('is_part_time'):
                 tie_breaker = rng.randint(0, 4)
-                # Reduced base reward from 30 to 2 to ensure it doesn't outweigh leveling penalties
-                objective_terms.append(shifts[(s, d)] * 2 + (shifts[(s, d)] * tie_breaker))
+                # Dynamic base shift reward (default 2)
+                base_reward = settings.get("base_shift_reward", 2)
+                objective_terms.append(shifts[(s, d)] * base_reward + (shifts[(s, d)] * tie_breaker))
 
     model.Maximize(sum(objective_terms))
 
