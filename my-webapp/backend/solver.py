@@ -241,7 +241,11 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
         if current_min > 0:
             # Sum up shifts of all staff who are NOT specialized drivers
             non_driver_only_indices = [s for s in range(num_staff) if not check_is_driver_only(staff_list[s])]
-            model.Add(sum(shifts[(s, d)] for s in non_driver_only_indices) >= current_min)
+            hc_count = sum(shifts[(s, d)] for s in non_driver_only_indices)
+            hc_shortage = model.NewIntVar(0, current_min, f'hc_shortage_d{d}')
+            model.Add(hc_count + hc_shortage >= current_min)
+            # Penalize missing total headcount less than specific roles, but more than leveling
+            objective_terms.append(hc_shortage * -500000)
 
     # 4. Monthly Workday Targets
     # For full-timers: target = num_days - (Sat+Sun+holiday) - paid_leave_days
