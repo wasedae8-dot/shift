@@ -197,15 +197,35 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
 
     # 3. Facility Requirements (Hard Constraints per Day)
     for d in operating_days:
-        model.Add(sum(role_assignments[(s, d, 'nurse')] for s in range(num_staff)) >= req_nurse)
-        model.Add(sum(role_assignments[(s, d, 'consultant')] for s in range(num_staff)) >= req_consultant)
-        model.Add(sum(role_assignments[(s, d, 'care')] for s in range(num_staff)) >= req_care)
-        model.Add(sum(role_assignments[(s, d, 'driver')] for s in range(num_staff)) >= req_driver)
-        # 看護師 + 機能訓練指導員 の合計は 2 以上
-        model.Add(
-            sum(role_assignments[(s, d, 'nurse')] for s in range(num_staff)) +
-            sum(role_assignments[(s, d, 'instructor')] for s in range(num_staff)) >= 2
-        )
+        # 1. Role Requirements (Nurse, Consultant, Care, Driver)
+        # Nurse Requirement
+        nurse_count = sum(role_assignments[(s, d, 'nurse')] for s in range(num_staff))
+        nurse_shortage = model.NewIntVar(0, req_nurse, f'nurse_shortage_d{d}')
+        model.Add(nurse_count + nurse_shortage >= req_nurse)
+        objective_terms.append(nurse_shortage * -W_MISSING_ROLE)
+
+        # Consultant Requirement
+        cons_count = sum(role_assignments[(s, d, 'consultant')] for s in range(num_staff))
+        cons_shortage = model.NewIntVar(0, req_consultant, f'cons_shortage_d{d}')
+        model.Add(cons_count + cons_shortage >= req_consultant)
+        objective_terms.append(cons_shortage * -W_MISSING_ROLE)
+
+        # Care Worker Requirement
+        care_count = sum(role_assignments[(s, d, 'care')] for s in range(num_staff))
+        care_shortage = model.NewIntVar(0, req_care, f'care_shortage_d{d}')
+        model.Add(care_count + care_shortage >= req_care)
+        objective_terms.append(care_shortage * -W_MISSING_ROLE)
+
+        # Driver Requirement
+        driver_count = sum(role_assignments[(s, d, 'driver')] for s in range(num_staff))
+        driver_shortage = model.NewIntVar(0, req_driver, f'driver_shortage_d{d}')
+        model.Add(driver_count + driver_shortage >= req_driver)
+        objective_terms.append(driver_shortage * -W_MISSING_ROLE)
+        # Nurse + Instructor Requirement
+        nurse_inst_count = nurse_count + sum(role_assignments[(s, d, 'instructor')] for s in range(num_staff))
+        nurse_inst_shortage = model.NewIntVar(0, 2, f'nurse_inst_shortage_d{d}')
+        model.Add(nurse_inst_count + nurse_inst_shortage >= 2)
+        objective_terms.append(nurse_inst_shortage * -W_MISSING_ROLE)
         
         # New Constraint: Minimum headcount excluding specialized drivers
         # Check for overrides or priority status
