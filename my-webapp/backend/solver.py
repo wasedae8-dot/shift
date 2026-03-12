@@ -137,12 +137,9 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
                 # To be safe, we allow them to NOT work if it helps, but reward working.
                 # model.Add(shifts[(s, d)] == 1) -> replaced by reward in objective
             else:
-                # Full-time driver-only staff: must work every operating day unless leave requested
-                is_driver_only = check_is_driver_only(staff_dict)
-                if is_driver_only and d in operating_days:
-                    has_leave = (staff_dict['id'], d) in leave_request_days
-                    if not has_leave:
-                        model.Add(shifts[(s, d)] == 1)
+                # Relaxed: driver-only staff usually work, but we allow them off if needed 
+                # (handled by monthly targets or general reward)
+                pass
 
     # role_assignments[(s, d, role)]: 1 if staff s acts as 'role' on day d
     roles = ['nurse', 'consultant', 'instructor', 'care', 'driver']
@@ -266,9 +263,17 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             # 公休日数 = 土曜 + 日曜 + 祝日 の合計（シフト制）
             target_work_days = num_days - public_holiday_count - paid_leave_days
             staff_targets[s] = target_work_days
-            # Must work between target-1 and target days
-            model.Add(sum(shifts[(s, d)] for d in operating_days) >= target_work_days - 1)
-            model.Add(sum(shifts[(s, d)] for d in operating_days) <= target_work_days)
+            # Soften Workday Targets: Penalize deviation from target
+            actual_work_days = sum(shifts[(s, d)] for d in operating_days)
+            # diff_target: penalty if actual < target - 1
+            shortage = model.NewIntVar(0, num_days, f'staff_target_shortage_s{s}')
+            model.Add(actual_work_days + shortage >= target_work_days - 1)
+            objective_terms.append(shortage * -10000)
+            
+            # diff_target_over: penalty if actual > target
+            excess = model.NewIntVar(0, num_days, f'staff_target_excess_s{s}')
+            model.Add(actual_work_days - excess <= target_work_days)
+            objective_terms.append(excess * -5000)
 
     # 5. Leave Requests (Hard Constraints)
     for req in requests:
