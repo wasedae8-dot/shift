@@ -253,12 +253,12 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             if s_idx != -1 and d in operating_days:
                 # If they DONT work, it's a reward (meeting the leave request)
                 if req.get('is_summer_vacation'):
-                    # Summer is priority 1
-                    objective_terms.append(shifts[(s_idx, d)].Not() * 1000)
+                    # Summer is priority 1 (Absolutely keep off)
+                    objective_terms.append(shifts[(s_idx, d)].Not() * 5000)
                 else:
                     # Normal leave request is priority 2
-                    # Weight 200: higher than balancing to keep them off when possible
-                    objective_terms.append(shifts[(s_idx, d)].Not() * 200)
+                    # Weight 400: Higher than Diff1 (150) but lower than Diff2 (1000)
+                    objective_terms.append(shifts[(s_idx, d)].Not() * 400)
 
     # 6. No 5 consecutive workdays (Soft Constraint - penalty-based)
     # Add penalty when 5 consecutive days are all worked
@@ -333,12 +333,14 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
         model.Add(daily_headcount > target_for_day - 3).OnlyEnforceIf(diff3_minus.Not())
         
         # Penalties (expressed as negative rewards for Maximize)
-        # diff1 is 300: outweighs leave request (200)
-        # diff2 is 1000: extremely high
+        # diff1 is 150: LOWER than leave request (400) 
+        # -> respects leave if it only makes count 13 instead of 14.
+        # diff2 is 1000: HIGHER than leave request (400)
+        # -> overrules leave if it would make count 12 instead of 14.
         # diff3 is 5000: almost hard constraint
         
-        objective_terms.append(diff1_plus.Not() * 300)
-        objective_terms.append(diff1_minus.Not() * 300)
+        objective_terms.append(diff1_plus.Not() * 150)
+        objective_terms.append(diff1_minus.Not() * 150)
         objective_terms.append(diff2_plus.Not() * 1000)
         objective_terms.append(diff2_minus.Not() * 1000)
         objective_terms.append(diff3_plus.Not() * 5000)
