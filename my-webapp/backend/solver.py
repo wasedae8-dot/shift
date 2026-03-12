@@ -190,6 +190,11 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             # No role if not working
             model.Add(sum(role_assignments[(s, d, r)] for r in roles) == 0).OnlyEnforceIf(shifts[(s, d)].Not())
 
+    # --- Soft Constraints & Penalties Initialization ---
+    objective_terms = []
+    # Penalties for missing required roles (very high to prioritize compliance)
+    W_MISSING_ROLE = 1000000 
+
     # 3. Facility Requirements (Hard Constraints per Day)
     for d in operating_days:
         model.Add(sum(role_assignments[(s, d, 'nurse')] for s in range(num_staff)) >= req_nurse)
