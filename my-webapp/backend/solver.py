@@ -31,15 +31,25 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
     # Saturdays + national holidays falling on weekdays → full-timers rotate off (公休シフト制)
     public_holiday_count = 0  # total Sat + Sun + national holidays
     
+    found_holidays = []
     for d in range(1, num_days + 1):
         current_date = datetime.date(year, month, d)
         is_saturday = current_date.weekday() == 5
         is_sunday = current_date.weekday() == 6
-        is_national_holiday = HAS_JPHOLIDAY and jpholiday.is_holiday(current_date)
         
-        # Count ALL weekends and national holidays as 公休 for full-timers
+        # Explicit check with jpholiday
+        is_national_holiday = False
+        if HAS_JPHOLIDAY:
+            try:
+                is_national_holiday = jpholiday.is_holiday(current_date)
+            except Exception as e:
+                print(f"ERROR: jpholiday.is_holiday failed for {current_date}: {e}")
+        
+        # Count Sat, Sun, and Holidays as Public Holidays (公休対象)
         if is_saturday or is_sunday or is_national_holiday:
             public_holiday_count += 1
+            if is_national_holiday:
+                found_holidays.append(f"{d}日")
         
         # Only Sundays (and year-end/new-year) close the facility
         is_closed = (current_date.month == 12 and current_date.day in [29, 30, 31]) or \
@@ -50,6 +60,12 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             closed_days.append(d)
         else:
             operating_days.append(d)
+
+    print(f"DEBUG: Calendar for {year}/{month}: total_days={num_days}, public_holidays={public_holiday_count}")
+    if HAS_JPHOLIDAY:
+        print(f"DEBUG: jpholiday detected: {', '.join(found_holidays)}")
+    else:
+        print("DEBUG: jpholiday IS NOT AVAILABLE")
 
     # Required daily placements
     req_nurse = 1
