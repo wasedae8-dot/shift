@@ -455,6 +455,16 @@ export default function Home() {
                       ) : assignment && assignment.roles.length > 0 ? (
                         <div className="flex flex-col gap-0.5 items-center justify-center w-full h-full py-0.5">
                           {assignment.roles
+                            .filter((r: Role) => {
+                              if (r !== 'driver') return true;
+                              // Show driver icon ONLY if they are an exclusive driver
+                              const isExclusiveDriver = staff.is_driver && 
+                                !staff.is_nurse && 
+                                !staff.is_care_worker && 
+                                !staff.is_consultant && 
+                                !staff.is_functional_trainer;
+                              return isExclusiveDriver;
+                            })
                             .map((r: Role, i: number) => (
                               <div key={i}>{renderRoleBadge(r)}</div>
                             ))}
