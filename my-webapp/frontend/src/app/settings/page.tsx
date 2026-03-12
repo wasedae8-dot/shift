@@ -173,22 +173,62 @@ export default function SettingsPage() {
             </button>
           </div>
 
-          <div className="space-y-4 pt-4 border-t border-dashed border-neutral-100">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-neutral-600">詳細パラメータ（上級者向け）</span>
-            </div>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-              <div className="space-y-1">
-                <label className="text-xs text-neutral-400">平準化ペナルティ (Low/Mid/High)</label>
-                <div className="flex gap-2">
-                  <span className="text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-600">{settings.weight_leveling_low}</span>
-                  <span className="text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-600">{settings.weight_leveling_mid}</span>
-                  <span className="text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-600">{settings.weight_leveling_high}</span>
+          <div className="space-y-6 pt-6 border-t border-dashed border-neutral-100">
+            <div>
+              <h3 className="text-sm font-bold text-neutral-700 mb-4">詳細パラメータ（上級者向け）</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">平準化ペナルティの設定</label>
+                  <p className="text-[11px] text-neutral-400 mb-2">数値が大きいほど、人数の偏りに対してAIが厳しく反応します。</p>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xs text-neutral-600">低度な偏り (±1人)</span>
+                      <input 
+                        type="number"
+                        value={settings.weight_leveling_low}
+                        onChange={(e) => setSettings({ ...settings, weight_leveling_low: parseInt(e.target.value) || 0 })}
+                        className="w-24 px-2 py-1 border border-neutral-200 rounded text-right text-sm focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xs text-neutral-600">中度な偏り (±2人)</span>
+                      <input 
+                        type="number"
+                        value={settings.weight_leveling_mid}
+                        onChange={(e) => setSettings({ ...settings, weight_leveling_mid: parseInt(e.target.value) || 0 })}
+                        className="w-24 px-2 py-1 border border-neutral-200 rounded text-right text-sm focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xs text-neutral-600">高度な偏り (±3人以上)</span>
+                      <input 
+                        type="number"
+                        value={settings.weight_leveling_high}
+                        onChange={(e) => setSettings({ ...settings, weight_leveling_high: parseInt(e.target.value) || 0 })}
+                        className="w-24 px-2 py-1 border border-neutral-200 rounded text-right text-sm focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-neutral-400">出勤基本報酬（タイブレーカー）</label>
-                <div className="text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-600 w-fit">{settings.base_shift_reward}</div>
+
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">出勤基本報酬</label>
+                  <p className="text-[11px] text-neutral-400 mb-2">出勤1回あたりの「加点」です。小さいほどバランス（平準化）が優先されます。</p>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-xs text-neutral-600">タイブレーカー値</span>
+                    <input 
+                      type="number"
+                      value={settings.base_shift_reward}
+                      onChange={(e) => setSettings({ ...settings, base_shift_reward: parseInt(e.target.value) || 0 })}
+                      className="w-24 px-2 py-1 border border-neutral-200 rounded text-right text-sm focus:ring-1 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div className="mt-4 p-3 bg-neutral-50 rounded-lg border border-neutral-100">
+                    <p className="text-[10px] text-neutral-500 leading-relaxed">
+                      💡 **ヒント**: 人数がバラバラになる場合はこの値を **1〜2** に下げ、逆に人が足りなくなる場合は **30以上** に上げてください。
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
