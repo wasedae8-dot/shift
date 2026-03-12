@@ -38,7 +38,7 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
     # 公休日数 = Saturdays + Sundays + Japanese national holidays
     # Sundays → facility closed (no one works)
     # Saturdays + national holidays falling on weekdays → full-timers rotate off (公休シフト制)
-    public_holiday_count = 0  # total Sat + Sun + national holidays
+    public_holiday_count = 0  # total Sat + Sun + national holidays + company holidays
     
     for d in range(1, num_days + 1):
         current_date = datetime.date(year, month, d)
@@ -46,15 +46,18 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
         is_sunday = current_date.weekday() == 6
         is_national_holiday = HAS_JPHOLIDAY and jpholiday.is_holiday(current_date)
         
-        # Count ALL weekends and national holidays as 公休 for full-timers
-        if is_saturday or is_sunday or is_national_holiday:
-            public_holiday_count += 1
+        # Determine if it's a company winter holiday (12/29-1/3)
+        is_winter_holiday = (current_date.month == 12 and current_date.day in [29, 30, 31]) or \
+                            (current_date.month == 1 and current_date.day in [1, 2, 3])
         
-        # Only Sundays (and year-end/new-year) close the facility
-        is_closed = (current_date.month == 12 and current_date.day in [29, 30, 31]) or \
-                    (current_date.month == 1 and current_date.day in [1, 2, 3]) or \
-                    is_sunday
-                    
+        # Only Sundays and company winter holidays close the facility
+        is_closed = is_sunday or is_winter_holiday
+        
+        # Count Sat + Sun + national holiday + company holiday as 公休 for full-timers
+        if is_saturday or is_sunday or is_national_holiday or is_winter_holiday:
+            public_holiday_count += 1
+            print(f"DEBUG: Day {d} is holiday (Sat:{is_saturday}, Sun:{is_sunday}, Nat:{is_national_holiday}, Winter:{is_winter_holiday}) -> Count: {public_holiday_count}")
+            
         if is_closed:
             closed_days.append(d)
         else:
@@ -310,6 +313,13 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
                             "staff_id": sid,
                             "reason": reason_code
                         })
+            else:
+                # Closed day: all staff are absent for reason '公'
+                for s in range(num_staff):
+                    daily_schedule["absences"].append({
+                        "staff_id": staff_list[s]["id"],
+                        "reason": "公"
+                    })
             schedule_result.append(daily_schedule)
             
         # Compile summary per staff
