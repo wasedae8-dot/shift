@@ -125,6 +125,29 @@ def verify_auth(request: Request):
         raise HTTPException(status_code=401, detail="Unauthorized")
         
     return {"status": "ok"}
+    
+@app.get("/api/auth/diag")
+def diagnostic():
+    try:
+        import jpholiday
+        import datetime
+        test_date = datetime.date(2026, 5, 4)
+        is_h = jpholiday.is_holiday(test_date)
+        return {
+            "jpholiday_installed": True,
+            "test_2026_05_04_is_holiday": is_h,
+            "python_version": os.popen("python --version").read().strip()
+        }
+    except ImportError:
+        return {
+            "jpholiday_installed": False,
+            "error": "ImportError"
+        }
+    except Exception as e:
+        return {
+            "jpholiday_installed": True,
+            "error": str(e)
+        }
 
 
 
