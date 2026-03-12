@@ -238,11 +238,7 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             model.Add(sum(shifts[(s, d)] for d in operating_days) >= target_work_days - 1)
             model.Add(sum(shifts[(s, d)] for d in operating_days) <= target_work_days)
 
-    # 5. Leave Requests (Soft Constraints → Objective terms)
-    # We now treat them as negotiable if needed for balancing.
-    # Summer vacation is still extremely high penalty.
-    objective_terms = []
-    
+    # 5. Leave Requests (Hard Constraints)
     for req in requests:
         req_date = datetime.datetime.strptime(req['date'], "%Y-%m-%d").date()
         if req_date.year == year and req_date.month == month:
@@ -251,17 +247,12 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             s_idx = next((i for i, v in enumerate(staff_list) if v['id'] == staff_id), -1)
             
             if s_idx != -1 and d in operating_days:
-                # If they DONT work, it's a reward (meeting the leave request)
-                if req.get('is_summer_vacation'):
-                    # Summer is priority 1 (Absolutely keep off)
-                    objective_terms.append(shifts[(s_idx, d)].Not() * 5000)
-                else:
-                    # Normal leave request is priority 2
-                    # Weight 400: Higher than Diff1 (150) but lower than Diff2 (1000)
-                    objective_terms.append(shifts[(s_idx, d)].Not() * 400)
+                # Hope is now an absolute hard constraint again to eliminate negotiation burden
+                model.Add(shifts[(s_idx, d)] == 0)
 
     # 6. No 5 consecutive workdays (Soft Constraint - penalty-based)
     # Add penalty when 5 consecutive days are all worked
+    objective_terms = []
     for s in range(num_staff):
         staff_data = staff_list[s]
         # Only apply for full-time staff (part-timers only work contracted days anyway)
@@ -383,8 +374,7 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
                             "staff_id": staff_list[s]["id"],
                             "name": staff_list[s]["name"],
                             "roles": assigned_roles,
-                            "is_driver": bool(staff_list[s].get('is_driver', False)),
-                            "was_requested_leave": (staff_list[s]["id"], d) in leave_request_days
+                            "is_driver": bool(staff_list[s].get('is_driver', False))
                         })
                         working_staff_ids.add(staff_list[s]["id"])
 

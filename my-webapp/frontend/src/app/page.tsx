@@ -15,7 +15,6 @@ type StaffAssignment = {
   name: string;
   roles: Role[];
   is_driver?: boolean;
-  was_requested_leave?: boolean;
 };
 
 type Absence = {
@@ -459,16 +458,6 @@ export default function Home() {
                             .map((r: Role, i: number) => (
                               <div key={i}>{renderRoleBadge(r)}</div>
                             ))}
-                          {assignment.was_requested_leave && (
-                            <div className="absolute top-0 right-0">
-                                <span className="flex h-3 w-3 items-center justify-center rounded-full bg-rose-500 ring-2 ring-white" title="希望休でしたが平準化のため出勤を提案（要相談）">
-                                  <span className="text-[8px] font-black text-white">!</span>
-                                </span>
-                            </div>
-                          )}
-                          {assignment.was_requested_leave && (
-                            <div className="w-full bg-rose-50/80 absolute inset-0 -z-10 animate-pulse"></div>
-                          )}
                         </div>
                       ) : absenceReason ? (
                         <span className={`inline-flex w-5 h-5 items-center justify-center font-bold text-[10px] rounded-full shadow-sm ${
