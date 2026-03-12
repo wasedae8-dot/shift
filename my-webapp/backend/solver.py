@@ -5,8 +5,9 @@ import random
 try:
     import jpholiday
     HAS_JPHOLIDAY = True
-except ImportError:
+except Exception as e:
     HAS_JPHOLIDAY = False
+    print(f"ERROR: Failed to import jpholiday: {e}")
 
 def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List[Dict], seed: int = 42) -> Dict[str, Any]:
     """
