@@ -68,15 +68,14 @@ async def password_protect(request: Request, call_next):
         return await call_next(request)
         
     app_password = os.getenv("APP_PASSWORD")
-    if not app_password:
-        app_password = "password"
     
     path = request.url.path
     
-    if app_password:
+    # If app_password is not set or empty, disable protection
+    if app_password and app_password.strip():
         app_password = app_password.strip()
-        # Protect everything under /api/ except docs
-        if path.startswith("/api/") and path not in ["/api/auth/diag", "/api/auth/db-diag"]:
+        # Protect everything under /api/ except specific diag routes
+        if path.startswith("/api/") and path not in ["/api/auth/diag", "/api/auth/verify"]:
             # Check custom header
             request_password = request.headers.get("X-App-Password")
             if request_password:
@@ -87,36 +86,15 @@ async def password_protect(request: Request, call_next):
                 response.headers["Access-Control-Allow-Origin"] = "*"
                 return response
 
-    
-    response = await call_next(request)
-    return response
+    return await call_next(request)
 
-# Allow CORS for all origins. Since we use custom headers and localStorage (not cookies),
-# we don't need allow_credentials=True, which makes Origins="*" work reliably.
-# Added AFTER password_protect so it wraps it and handles early 401 responses.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/")
-def read_root():
-    return {"message": "Shift Scheduling Optimization API is running."}
+# ... CORS middleware ...
 
 @app.get("/api/auth/verify")
 def verify_auth(request: Request):
-    """
-    Endpoint for the frontend to verify if the password is correct.
-    """
     app_password = os.getenv("APP_PASSWORD")
-    if not app_password:
-        app_password = "password"
-    
-    if not app_password:
-        return {"status": "ok", "warning": "APP_PASSWORD not set"}
+    if not app_password or not app_password.strip():
+        return {"status": "ok", "auth_required": False}
         
     app_password = app_password.strip()
     request_password = request.headers.get("X-App-Password", "").strip()
@@ -124,7 +102,7 @@ def verify_auth(request: Request):
     if request_password != app_password:
         raise HTTPException(status_code=401, detail="Unauthorized")
         
-    return {"status": "ok"}
+    return {"status": "ok", "auth_required": True}
     
 @app.get("/api/auth/diag")
 def diagnostic():
