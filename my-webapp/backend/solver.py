@@ -9,9 +9,9 @@ except (ImportError, TypeError):
     # TypeError can occur on Python 3.8 due to jpholiday's modern type hinting
     HAS_JPHOLIDAY = False
 
-def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List[Dict], facility_id: int = 1, seed: int = 42) -> Dict[str, Any]:
+def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List[Dict], facility_id: int = 1, seed: int = 42, constraints: List[Dict] = None) -> Dict[str, Any]:
     """
-    Generates a shift schedule based on staff skills, monthly calendar constraints, and leave requests.
+    Generates a shift schedule based on staff skills, monthly calendar constraints, leave requests, and daily overrides.
     """
     model = cp_model.CpModel()
     rng = random.Random(seed)
@@ -62,6 +62,20 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             closed_days.append(d)
         else:
             operating_days.append(d)
+            
+    # Parse constraints into a lookup: day -> {min_headcount_override: int|None, is_priority: bool}
+    constraint_lookup = {}
+    if constraints:
+        for c in constraints:
+            try:
+                c_date = datetime.datetime.strptime(c['date'], "%Y-%m-%d").date()
+                if c_date.year == year and c_date.month == month:
+                    constraint_lookup[c_date.day] = {
+                        "min_headcount_override": c.get('min_headcount_override'),
+                        "is_priority": c.get('is_priority', False)
+                    }
+            except Exception:
+                continue
     
     # Helper to identify specialized drivers (only driver role)
     def check_is_driver_only(s_dict):
@@ -186,10 +200,20 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
         )
         
         # New Constraint: Minimum headcount excluding specialized drivers
-        if min_headcount > 0:
+        # Check for overrides or priority status
+        day_info = constraint_lookup.get(d, {})
+        current_min = day_info.get('min_headcount_override')
+        if current_min is None:
+            current_min = min_headcount
+            
+        # If it's a priority day, bump it! (e.g., +3 from base)
+        if day_info.get('is_priority'):
+            current_min = max(current_min, min_headcount + 3)
+
+        if current_min > 0:
             # Sum up shifts of all staff who are NOT specialized drivers
             non_driver_only_indices = [s for s in range(num_staff) if not check_is_driver_only(staff_list[s])]
-            model.Add(sum(shifts[(s, d)] for s in non_driver_only_indices) >= min_headcount)
+            model.Add(sum(shifts[(s, d)] for s in non_driver_only_indices) >= current_min)
 
     # 4. Monthly Workday Targets
     # For full-timers: target = num_days - (Sat+Sun+holiday) - paid_leave_days
@@ -246,12 +270,39 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
                     # Penalize 5-consecutive heavily
                     objective_terms.append(consecutive_5.Not() * 8)
 
-    # 7. Equal distribution: reward every shift worked by full-time staff
-    #    This pushes each full-timer to reach their exact target (not target-1)
+    # 7. Equal distribution and Leveling
+    # Calculate average target headcount to stay near it
+    total_staff_workdays = 0
     for s in range(num_staff):
         if not staff_list[s].get('is_part_time'):
+            total_staff_workdays += staff_targets.get(s, 0)
+        else:
+            # Estimate part-timer workdays (roughly count contracted days)
+            # This helps in balancing even if part-timers are fixed
             for d in operating_days:
-                # Weight 3: each additional shift worked is encouraged, up to target
+                # This is a bit rough but works for balancing
+                total_staff_workdays += 1 # Simplified: assume they work if it's their day
+    
+    avg_headcount = total_staff_workdays / max(1, len(operating_days))
+    soft_upper_limit = int(avg_headcount + 1)
+    
+    for d in operating_days:
+        daily_headcount = sum(shifts[(s, d)] for s in range(num_staff))
+        
+        # Penalize exceeding the soft upper limit
+        # This discourages the 18-person days noticed by the user
+        is_over_limit = model.NewBoolVar(f'over_limit_d{d}')
+        model.Add(daily_headcount > soft_upper_limit).OnlyEnforceIf(is_over_limit)
+        model.Add(daily_headcount <= soft_upper_limit).OnlyEnforceIf(is_over_limit.Not())
+        
+        # Priority days should NOT be penalized for being over the limit (within reason)
+        day_info = constraint_lookup.get(d, {})
+        if not day_info.get('is_priority'):
+            objective_terms.append(is_over_limit.Not() * 20) # Reward staying under the soft limit
+
+        # Tie breaker / Individual targets
+        for s in range(num_staff):
+            if not staff_list[s].get('is_part_time'):
                 tie_breaker = rng.randint(0, 4)
                 objective_terms.append(shifts[(s, d)] * 30 + (shifts[(s, d)] * tie_breaker))
 

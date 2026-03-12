@@ -244,6 +244,37 @@ def delete_request(request_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True}
 
+# --- Daily Constraints ---
+@app.get("/api/constraints/", response_model=List[schemas.DailyConstraint])
+def read_constraints(facility_id: int, year: int, month: int, db: Session = Depends(get_db)):
+    # Calculate date range for the month
+    start_date = f"{year}-{month:02d}-01"
+    # Simplified end date check
+    end_date = f"{year}-{month:02d}-31"
+    return db.query(models.DailyConstraint).filter(
+        models.DailyConstraint.facility_id == facility_id,
+        models.DailyConstraint.date >= start_date,
+        models.DailyConstraint.date <= end_date
+    ).all()
+
+@app.post("/api/constraints/", response_model=schemas.DailyConstraint)
+def create_or_update_constraint(constraint: schemas.DailyConstraintCreate, db: Session = Depends(get_db)):
+    db_constraint = db.query(models.DailyConstraint).filter(
+        models.DailyConstraint.facility_id == constraint.facility_id,
+        models.DailyConstraint.date == constraint.date
+    ).first()
+    
+    if db_constraint:
+        db_constraint.min_headcount_override = constraint.min_headcount_override
+        db_constraint.is_priority = constraint.is_priority
+    else:
+        db_constraint = models.DailyConstraint(**constraint.dict())
+        db.add(db_constraint)
+    
+    db.commit()
+    db.refresh(db_constraint)
+    return db_constraint
+
 # --- Solver Engine ---
 @app.get("/api/generate-schedule/")
 def generate_schedule(year: int, month: int, facility_id: int, seed: Optional[int] = None, db: Session = Depends(get_db)):
@@ -296,9 +327,22 @@ def generate_schedule(year: int, month: int, facility_id: int, seed: Optional[in
             "reason": r.reason,
             "is_summer_vacation": r.is_summer_vacation
         })
+    
+    # 3. Fetch daily constraints
+    constraint_records = db.query(models.DailyConstraint).filter(
+        models.DailyConstraint.facility_id == facility_id,
+        models.DailyConstraint.date.like(f"{year}-{month:02d}-%")
+    ).all()
+    constraints_list = []
+    for c in constraint_records:
+        constraints_list.append({
+            "date": c.date,
+            "min_headcount_override": c.min_headcount_override,
+            "is_priority": c.is_priority
+        })
         
-    # 3. Call the Python OR-Tools Logic
-    result = solve_schedule(year, month, staff_list, requests_list, facility_id=facility_id, seed=effective_seed)
+    # 4. Call the Python OR-Tools Logic
+    result = solve_schedule(year, month, staff_list, requests_list, facility_id=facility_id, seed=effective_seed, constraints=constraints_list)
     
     if result.get("status") == "failed":
         raise HTTPException(status_code=400, detail=result.get("error"))

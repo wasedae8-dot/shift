@@ -60,3 +60,19 @@ class LeaveRequest(LeaveRequestBase):
 
     class Config:
         orm_mode = True
+
+# --- DailyConstraint Schemas ---
+class DailyConstraintBase(BaseModel):
+    facility_id: int
+    date: str
+    min_headcount_override: Optional[int] = None
+    is_priority: bool = False
+
+class DailyConstraintCreate(DailyConstraintBase):
+    pass
+
+class DailyConstraint(DailyConstraintBase):
+    id: int
+
+    class Config:
+        orm_mode = True

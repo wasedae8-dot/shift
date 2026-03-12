@@ -35,6 +35,14 @@ type StaffSummary = {
   public_holidays: number;
 };
 
+type DailyConstraint = {
+  id?: number;
+  facility_id: number;
+  date: string;
+  min_headcount_override: number | null;
+  is_priority: boolean;
+};
+
 type OptimizationResult = {
   status: string;
   schedule?: DailySchedule[];
@@ -50,6 +58,8 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const [scheduleData, setScheduleData] = useState<OptimizationResult | null>(null);
+  const [constraints, setConstraints] = useState<DailyConstraint[]>([]);
+  const [isSavingConstraint, setIsSavingConstraint] = useState(false);
 
   useEffect(() => {
     const facilityId = localStorage.getItem('selected_facility_id');
@@ -61,6 +71,54 @@ export default function Home() {
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
+
+  const fetchConstraints = async () => {
+    const facilityId = selectedFacilityId || localStorage.getItem('selected_facility_id');
+    if (!facilityId) return;
+    try {
+      const response = await fetchWithAuth(`${API_BASE}/api/constraints/?facility_id=${facilityId}&year=${year}&month=${month}`);
+      if (response.ok) {
+        setConstraints(await response.json());
+      }
+    } catch (error) {
+      console.error("Error fetching constraints:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchConstraints();
+  }, [year, month, selectedFacilityId]);
+
+  const togglePriority = async (day: number) => {
+    const facilityId = selectedFacilityId || localStorage.getItem('selected_facility_id');
+    if (!facilityId) return;
+    
+    setIsSavingConstraint(true);
+    const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    const existing = constraints.find(c => c.date === dateStr);
+    
+    const payload: DailyConstraint = {
+      facility_id: parseInt(facilityId),
+      date: dateStr,
+      min_headcount_override: existing?.min_headcount_override || null,
+      is_priority: !existing?.is_priority
+    };
+
+    try {
+      const response = await fetchWithAuth(`${API_BASE}/api/constraints/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        await fetchConstraints();
+      }
+    } catch (error) {
+      console.error("Error saving constraint:", error);
+    } finally {
+      setIsSavingConstraint(false);
+    }
+  };
 
   const daysInMonth = getDaysInMonth(new Date(year, month - 1));
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -326,6 +384,40 @@ export default function Home() {
             <div className="w-10 shrink-0 flex flex-col items-center justify-center border-neutral-200 py-1 bg-orange-50 text-orange-800">
               <span className="text-[10px] font-black">有休等</span>
             </div>
+          </div>
+
+          {/* Priority Settings Row */}
+          <div className="flex border-b border-neutral-300 bg-indigo-50/30">
+            <div className="w-40 shrink-0 p-2 border-r border-neutral-300 flex items-center justify-center font-bold text-xs bg-indigo-100/50 text-indigo-800 sticky left-0 z-10">
+              ✨ 重点配置設定
+            </div>
+            {daysArray.map(day => {
+              const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+              const constraint = constraints.find(c => c.date === dateStr);
+              const isPriority = constraint?.is_priority || false;
+              const closed = isDayClosed(day);
+              
+              return (
+                <div 
+                  key={`priority-${day}`} 
+                  onClick={() => !closed && togglePriority(day)}
+                  className={`w-9 shrink-0 flex flex-col items-center justify-center border-r border-neutral-200 py-2 cursor-pointer transition-all hover:bg-indigo-100 ${closed ? 'opacity-20 cursor-not-allowed' : ''}`}
+                  title={closed ? "休館日です" : "クリックして重点配置(人数多め)を切り替え"}
+                >
+                  {isPriority ? (
+                    <div className="flex flex-col items-center animate-bounce">
+                      <span className="text-[10px] font-black text-rose-600 leading-none">重点</span>
+                      <div className="w-2 h-2 bg-rose-500 rounded-full mt-0.5 shadow-sm"></div>
+                    </div>
+                  ) : (
+                    <div className="w-1.5 h-1.5 bg-neutral-300 rounded-full"></div>
+                  )}
+                </div>
+              );
+            })}
+            <div className="w-10 shrink-0 border-l-2 border-l-neutral-400" />
+            <div className="w-10 shrink-0" />
+            <div className="w-10 shrink-0" />
           </div>
 
           {/* Body Rows: Staff */}

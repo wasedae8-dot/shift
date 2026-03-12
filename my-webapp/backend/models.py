@@ -62,3 +62,12 @@ class LeaveRequest(Base):
     is_summer_vacation = Column(Boolean, default=False)
 
     staff = relationship("Staff", back_populates="leave_requests")
+
+class DailyConstraint(Base):
+    __tablename__ = "daily_constraints"
+
+    id = Column(Integer, primary_key=True, index=True)
+    facility_id = Column(Integer, ForeignKey("facilities.id"))
+    date = Column(String, index=True) # e.g. "2026-08-13"
+    min_headcount_override = Column(Integer, nullable=True) # If set, overrides the default
+    is_priority = Column(Boolean, default=False)
