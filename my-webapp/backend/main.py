@@ -41,19 +41,33 @@ async def startup_event():
         db = SessionLocal()
         try:
             facility_data = [
-                {"id": 1, "name": "サンケア上池台"},
-                {"id": 2, "name": "サンケア鵜の木"}
+                {"id": 1, "name": "サンケア上池台", "min_hc": 12},
+                {"id": 2, "name": "サンケア鵜の木", "min_hc": 9}
             ]
             for f_info in facility_data:
                 existing = db.query(models.Facility).filter(models.Facility.id == f_info["id"]).first()
                 if not existing:
                     new_f = models.Facility(id=f_info["id"], name=f_info["name"])
                     db.add(new_f)
+                    db.flush()
                     print(f"INFO: Created facility: {f_info['name']}")
                 else:
                     if existing.name != f_info["name"]:
                         existing.name = f_info["name"]
-                        print(f"INFO: Updated facility {f_info['id']} name to: {f_info['name']}")
+                
+                # Ensure settings exist
+                setting = db.query(models.FacilitySetting).filter(models.FacilitySetting.facility_id == f_info["id"]).first()
+                if not setting:
+                    new_s = models.FacilitySetting(
+                        facility_id=f_info["id"], 
+                        min_headcount=f_info["min_hc"],
+                        weight_leveling_low=2000, 
+                        weight_leveling_mid=8000,
+                        weight_leveling_high=25000,
+                        base_shift_reward=2
+                    )
+                    db.add(new_s)
+                    print(f"INFO: Created default settings for facility {f_info['id']}")
             db.commit()
         finally:
             db.close()
@@ -275,6 +289,32 @@ def create_or_update_constraint(constraint: schemas.DailyConstraintCreate, db: S
     db.refresh(db_constraint)
     return db_constraint
 
+# --- Facility Settings ---
+@app.get("/api/settings/{facility_id}", response_model=schemas.FacilitySetting)
+def read_settings(facility_id: int, db: Session = Depends(get_db)):
+    setting = db.query(models.FacilitySetting).filter(models.FacilitySetting.facility_id == facility_id).first()
+    if not setting:
+        # Create default if not exists
+        setting = models.FacilitySetting(facility_id=facility_id)
+        db.add(setting)
+        db.commit()
+        db.refresh(setting)
+    return setting
+
+@app.post("/api/settings/", response_model=schemas.FacilitySetting)
+def update_settings(setting: schemas.FacilitySettingCreate, db: Session = Depends(get_db)):
+    db_setting = db.query(models.FacilitySetting).filter(models.FacilitySetting.facility_id == setting.facility_id).first()
+    if db_setting:
+        for key, value in setting.dict().items():
+            setattr(db_setting, key, value)
+    else:
+        db_setting = models.FacilitySetting(**setting.dict())
+        db.add(db_setting)
+    
+    db.commit()
+    db.refresh(db_setting)
+    return db_setting
+
 # --- Solver Engine ---
 @app.get("/api/generate-schedule/")
 def generate_schedule(year: int, month: int, facility_id: int, seed: Optional[int] = None, db: Session = Depends(get_db)):
@@ -341,8 +381,29 @@ def generate_schedule(year: int, month: int, facility_id: int, seed: Optional[in
             "is_priority": c.is_priority
         })
         
-    # 4. Call the Python OR-Tools Logic
-    result = solve_schedule(year, month, staff_list, requests_list, facility_id=facility_id, seed=effective_seed, constraints=constraints_list)
+    # 4. Fetch Facility Settings for parameters
+    setting_record = db.query(models.FacilitySetting).filter(models.FacilitySetting.facility_id == facility_id).first()
+    settings_dict = {}
+    if setting_record:
+        settings_dict = {
+            "min_headcount": setting_record.min_headcount,
+            "weight_leveling_low": setting_record.weight_leveling_low,
+            "weight_leveling_mid": setting_record.weight_leveling_mid,
+            "weight_leveling_high": setting_record.weight_leveling_high,
+            "base_shift_reward": setting_record.base_shift_reward
+        }
+    else:
+        # Fallback to defaults
+        settings_dict = {
+            "min_headcount": 12 if facility_id == 1 else 9,
+            "weight_leveling_low": 2000,
+            "weight_leveling_mid": 8000,
+            "weight_leveling_high": 25000,
+            "base_shift_reward": 2
+        }
+
+    # 5. Call the Python OR-Tools Logic
+    result = solve_schedule(year, month, staff_list, requests_list, facility_id=facility_id, seed=effective_seed, constraints=constraints_list, settings=settings_dict)
     
     if result.get("status") == "failed":
         raise HTTPException(status_code=400, detail=result.get("error"))

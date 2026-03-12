@@ -76,3 +76,21 @@ class DailyConstraint(DailyConstraintBase):
 
     class Config:
         orm_mode = True
+
+# --- FacilitySetting Schemas ---
+class FacilitySettingBase(BaseModel):
+    facility_id: int
+    min_headcount: int = 12
+    weight_leveling_low: int = 150
+    weight_leveling_mid: int = 1000
+    weight_leveling_high: int = 5000
+    base_shift_reward: int = 30
+
+class FacilitySettingCreate(FacilitySettingBase):
+    pass
+
+class FacilitySetting(FacilitySettingBase):
+    id: int
+
+    class Config:
+        orm_mode = True

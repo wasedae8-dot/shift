@@ -71,3 +71,22 @@ class DailyConstraint(Base):
     date = Column(String, index=True) # e.g. "2026-08-13"
     min_headcount_override = Column(Integer, nullable=True) # If set, overrides the default
     is_priority = Column(Boolean, default=False)
+
+class FacilitySetting(Base):
+    __tablename__ = "facility_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    facility_id = Column(Integer, ForeignKey("facilities.id"), unique=True)
+    
+    # Core headcount requirement
+    min_headcount = Column(Integer, default=12)
+    
+    # Penalties for deviation from target headcount
+    # Higher values means stricter balancing
+    weight_leveling_low = Column(Integer, default=150)
+    weight_leveling_mid = Column(Integer, default=1000)
+    weight_leveling_high = Column(Integer, default=5000)
+    
+    # Base reward for a shift (tie breaker / bias)
+    # Lower values prioritize balancing over filling shifts
+    base_shift_reward = Column(Integer, default=30)
