@@ -157,7 +157,10 @@ def read_staff(facility_id: Optional[int] = None, skip: int = 0, limit: int = 10
 def create_staff(staff: schemas.StaffCreate, db: Session = Depends(get_db)):
     # Assign next sort_order
     max_order = db.query(models.Staff).count()
-    db_staff = models.Staff(**staff.dict(), sort_order=max_order)
+    staff_dict = staff.dict()
+    # Remove sort_order if it was passed in the schema to avoid duplicate keyword argument
+    staff_dict.pop("sort_order", None)
+    db_staff = models.Staff(**staff_dict, sort_order=max_order)
     db.add(db_staff)
     db.commit()
     db.refresh(db_staff)
