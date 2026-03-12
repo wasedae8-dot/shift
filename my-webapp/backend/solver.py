@@ -281,7 +281,8 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
                 total_staff_workdays += 1 # Simplified: assume they work if it's their day
     
     avg_headcount = total_staff_workdays / max(1, len(operating_days))
-    soft_upper_limit = int(avg_headcount + 1)
+    # Use rounded average to stay centered
+    soft_upper_limit = int(avg_headcount + 0.5)
     
     for d in operating_days:
         daily_headcount = sum(shifts[(s, d)] for s in range(num_staff))
@@ -323,25 +324,24 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
         model.Add(daily_headcount <= target_for_day - 3).OnlyEnforceIf(diff3_minus)
         model.Add(daily_headcount > target_for_day - 3).OnlyEnforceIf(diff3_minus.Not())
         
-        # Penalties (expressed as negative rewards for Maximize)
-        # diff1 is 150: LOWER than leave request (400) 
-        # -> respects leave if it only makes count 13 instead of 14.
-        # diff2 is 1000: HIGHER than leave request (400)
-        # -> overrules leave if it would make count 12 instead of 14.
-        # diff3 is 5000: almost hard constraint
+        # Penalties (significantly strengthened to prioritize leveling)
+        # diff1 is now 2000 (was 150)
+        # diff2 is now 8000 (was 1000)
+        # diff3 is 20000+ (was 5000)
         
-        objective_terms.append(diff1_plus.Not() * 150)
-        objective_terms.append(diff1_minus.Not() * 150)
-        objective_terms.append(diff2_plus.Not() * 1000)
-        objective_terms.append(diff2_minus.Not() * 1000)
-        objective_terms.append(diff3_plus.Not() * 5000)
-        objective_terms.append(diff3_minus.Not() * 5000)
+        objective_terms.append(diff1_plus.Not() * 2000)
+        objective_terms.append(diff1_minus.Not() * 2000)
+        objective_terms.append(diff2_plus.Not() * 8000)
+        objective_terms.append(diff2_minus.Not() * 8000)
+        objective_terms.append(diff3_plus.Not() * 25000)
+        objective_terms.append(diff3_minus.Not() * 25000)
 
         # Tie breaker / Individual targets
         for s in range(num_staff):
             if not staff_list[s].get('is_part_time'):
                 tie_breaker = rng.randint(0, 4)
-                objective_terms.append(shifts[(s, d)] * 30 + (shifts[(s, d)] * tie_breaker))
+                # Reduced base reward from 30 to 2 to ensure it doesn't outweigh leveling penalties
+                objective_terms.append(shifts[(s, d)] * 2 + (shifts[(s, d)] * tie_breaker))
 
     model.Maximize(sum(objective_terms))
 
