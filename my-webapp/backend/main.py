@@ -131,12 +131,22 @@ def diagnostic():
     try:
         import jpholiday
         import datetime
+        import solver
+        
+        # Test specific date
         test_date = datetime.date(2026, 5, 4)
         is_h = jpholiday.is_holiday(test_date)
+        
+        # Get all holidays for May 2026
+        may_holidays = jpholiday.month_holidays(2026, 5)
+        
         return {
             "jpholiday_installed": True,
+            "solver_HAS_JPHOLIDAY": solver.HAS_JPHOLIDAY,
             "test_2026_05_04_is_holiday": is_h,
-            "python_version": os.popen("python --version").read().strip()
+            "may_2026_holidays": [str(h[0]) + ": " + h[1] for h in may_holidays],
+            "python_version": os.popen("python --version").read().strip(),
+            "server_time": datetime.datetime.now().isoformat()
         }
     except ImportError:
         return {
