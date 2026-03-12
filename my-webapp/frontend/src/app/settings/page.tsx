@@ -256,6 +256,7 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        </section>
         {/* Section 3: Algorithm Guide */}
         <section className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 mb-4">
           <div className="flex items-start gap-4 mb-4">
