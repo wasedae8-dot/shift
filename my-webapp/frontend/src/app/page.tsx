@@ -283,6 +283,26 @@ export default function Home() {
       csvContent += rowContent;
     });
     
+    // Append violation alerts if any
+    if (scheduleData.violations && scheduleData.violations.length > 0) {
+      csvContent += "\r\nアラート情報\r\n";
+      const leaveViolations = scheduleData.violations.filter(v => v.type === 'leave');
+      if (leaveViolations.length > 0) {
+        csvContent += "希望休が叶えられなかったスタッフ\r\n";
+        leaveViolations.forEach(v => {
+          csvContent += `"${v.staff_name} さん","${v.date} 日"\r\n`;
+        });
+      }
+      
+      const excessViolations = scheduleData.violations.filter(v => v.type === 'workday_excess');
+      if (excessViolations.length > 0) {
+        csvContent += "公休の不足（出勤過多）\r\n";
+        excessViolations.forEach(v => {
+          csvContent += `"${v.staff_name} さん","公休 ${v.excess_days}日不足"\r\n`;
+        });
+      }
+    }
+    
     const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
