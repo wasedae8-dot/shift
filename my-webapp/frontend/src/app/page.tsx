@@ -217,10 +217,10 @@ export default function Home() {
         // Look up full staff metadata to check for exclusive driver status
         const staffMeta = allStaff.find(as => as.id === s.staff_id);
         const isExclusiveDriver = staffMeta?.is_driver && 
-          !staffMeta.is_nurse && 
-          !staffMeta.is_care_worker && 
-          !staffMeta.is_consultant && 
-          !staffMeta.is_functional_trainer;
+          !staffMeta?.is_nurse && 
+          !staffMeta?.is_care_worker && 
+          !staffMeta?.is_consultant && 
+          !staffMeta?.is_functional_trainer;
 
         if (!isExclusiveDriver) {
           totals[day].total += 1;
