@@ -214,7 +214,18 @@ export default function Home() {
       totals[day] = { nurse: 0, consultant: 0, care: 0, instructor: 0, driver: 0, total: 0 };
       
       daySchedule.staff.forEach((s: StaffAssignment) => {
-        totals[day].total += 1;
+        // Look up full staff metadata to check for exclusive driver status
+        const staffMeta = allStaff.find(as => as.id === s.staff_id);
+        const isExclusiveDriver = staffMeta?.is_driver && 
+          !staffMeta.is_nurse && 
+          !staffMeta.is_care_worker && 
+          !staffMeta.is_consultant && 
+          !staffMeta.is_functional_trainer;
+
+        if (!isExclusiveDriver) {
+          totals[day].total += 1;
+        }
+        
         if (s.is_driver) totals[day].driver += 1;
         s.roles.forEach((r: Role) => {
           if (r !== 'driver') {
