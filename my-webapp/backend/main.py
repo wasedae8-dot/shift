@@ -10,6 +10,7 @@ import models, schemas
 from database import engine, get_db
 from solver import solve_schedule
 from datetime import datetime
+import sys
 
 # Tables will be created in startup_event to avoid crashing on import if DB is down
 
@@ -105,6 +106,31 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"message": "Shift Scheduling Optimization API is running."}
+
+@app.get("/api/auth/diag")
+def diagnostic():
+    """Diagnostic endpoint to check holiday detection status."""
+    import solver
+    import datetime
+    
+    # Check May 2026 holidays
+    may_holidays = []
+    if solver.HAS_JPHOLIDAY:
+        import jpholiday
+        for d in range(1, 32):
+            dt = datetime.date(2026, 5, d)
+            if jpholiday.is_holiday(dt):
+                may_holidays.append({
+                    "date": dt.strftime("%Y-%m-%d"),
+                    "name": jpholiday.is_holiday_name(dt)
+                })
+    
+    return {
+        "jpholiday_available": solver.HAS_JPHOLIDAY,
+        "python_version": sys.version,
+        "may_2026_holidays": may_holidays,
+        "may_holiday_count": len(may_holidays)
+    }
 
 @app.get("/api/auth/verify")
 def verify_auth(request: Request):

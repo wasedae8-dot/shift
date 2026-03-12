@@ -5,7 +5,8 @@ import random
 try:
     import jpholiday
     HAS_JPHOLIDAY = True
-except ImportError:
+except (ImportError, TypeError):
+    # TypeError can occur on Python 3.8 due to jpholiday's modern type hinting
     HAS_JPHOLIDAY = False
 
 def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List[Dict], seed: int = 42) -> Dict[str, Any]:
