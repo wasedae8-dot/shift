@@ -232,6 +232,36 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        {/* Section 3: Algorithm Guide */}
+        <section className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 mb-4">
+          <div className="flex items-start gap-4 mb-4">
+            <div className="p-2 bg-indigo-100 rounded-lg text-indigo-700">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <h2 className="text-lg font-bold text-neutral-900">AIアルゴリズムの解説</h2>
+          </div>
+          
+          <div className="space-y-4 text-sm text-neutral-700 leading-relaxed">
+            <div className="bg-white/60 p-4 rounded-xl">
+              <h4 className="font-bold text-indigo-900 mb-1">1. 目標人数の自動決定</h4>
+              <p>AIはまず、全スタッフの「契約上の出勤日数」を合計し、それを営業日数で割って**日次の平均人数（ターゲット）**を算出します。この値を基準に、多すぎず少なすぎない配置を目指します。</p>
+            </div>
+
+            <div className="bg-white/60 p-4 rounded-xl">
+              <h4 className="font-bold text-indigo-900 mb-1">2. 強力な制約（ハード制約）</h4>
+              <p>「休み希望（希望休・有休・夏休）」は**絶対的なルール**として扱われます。どれだけ人数が不足していても、AIが勝手に休み希望を無視してシフトを入れることはありません。</p>
+            </div>
+
+            <div className="bg-white/60 p-4 rounded-xl">
+              <h4 className="font-bold text-indigo-900 mb-1">3. 重み付けとバランス調整</h4>
+              <p>「平準化ペナルティ」は、目標人数から±1人、±2人と外れるごとにAIが感じる**「不快感（マイナス点）」**の大きさです。この値を大きくすると、AIは個人の連勤数などを犠牲にしてでも、人数を揃えることを優先します。</p>
+            </div>
+
+            <div className="bg-white/60 p-4 rounded-xl">
+              <h4 className="font-bold text-indigo-900 mb-1">4. 出勤基本報酬の役割</h4>
+              <p>これは1回の出勤ごとにAIがもらえる**「ご褒美（プラス点）」**です。この値が高いと、AIは積極的に人を配置しようとします。逆に低く設定すると、無駄な出勤を減らし、平準化（均一化）を優先するようになります。</p>
+            </div>
+          </div>
         </section>
 
         <div className="flex justify-end pt-4">
