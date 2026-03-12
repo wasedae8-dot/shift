@@ -9,12 +9,21 @@ except (ImportError, TypeError):
     # TypeError can occur on Python 3.8 due to jpholiday's modern type hinting
     HAS_JPHOLIDAY = False
 
-def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List[Dict], seed: int = 42) -> Dict[str, Any]:
+def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List[Dict], facility_id: int = 1, seed: int = 42) -> Dict[str, Any]:
     """
     Generates a shift schedule based on staff skills, monthly calendar constraints, and leave requests.
     """
     model = cp_model.CpModel()
     rng = random.Random(seed)
+    
+    # Define facility-specific minimum headcount (excluding specialized drivers)
+    # Facility 1 (Ukeigadai): 12-13 -> We use 12 as minimum
+    # Facility 2 (Unoki): 9-10 -> We use 9 as minimum
+    min_headcount = 0
+    if facility_id == 1:
+        min_headcount = 12
+    elif facility_id == 2:
+        min_headcount = 9
     
     # 1. Establish the Calendar
     if month == 12:
@@ -50,6 +59,14 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             closed_days.append(d)
         else:
             operating_days.append(d)
+    
+    # Helper to identify specialized drivers (only driver role)
+    def check_is_driver_only(s_dict):
+        return s_dict.get('is_driver') and \
+               not s_dict.get('is_care_worker') and \
+               not s_dict.get('is_nurse') and \
+               not s_dict.get('is_consultant') and \
+               not s_dict.get('is_functional_trainer')
 
     # Required daily placements
     req_nurse = 1
@@ -101,11 +118,7 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
                 # else: has leave → allowed to be off
             else:
                 # Full-time driver-only staff: must work every operating day unless leave requested
-                is_driver_only = staff_dict.get('is_driver') and \
-                    not staff_dict.get('is_care_worker') and \
-                    not staff_dict.get('is_nurse') and \
-                    not staff_dict.get('is_consultant') and \
-                    not staff_dict.get('is_functional_trainer')
+                is_driver_only = check_is_driver_only(staff_dict)
                 if is_driver_only and d in operating_days:
                     has_leave = (staff_dict['id'], d) in leave_request_days
                     if not has_leave:
@@ -116,7 +129,7 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
     role_assignments = {}
     for s in range(num_staff):
         staff_dict = staff_list[s]
-        is_driver_only = staff_dict.get('is_driver') and not staff_dict.get('is_care_worker')
+        is_driver_only = check_is_driver_only(staff_dict)
         
         for d in operating_days:
             for r in roles:
@@ -168,6 +181,12 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             sum(role_assignments[(s, d, 'nurse')] for s in range(num_staff)) +
             sum(role_assignments[(s, d, 'instructor')] for s in range(num_staff)) >= 2
         )
+        
+        # New Constraint: Minimum headcount excluding specialized drivers
+        if min_headcount > 0:
+            # Sum up shifts of all staff who are NOT specialized drivers
+            non_driver_only_indices = [s for s in range(num_staff) if not check_is_driver_only(staff_list[s])]
+            model.Add(sum(shifts[(s, d)] for s in non_driver_only_indices) >= min_headcount)
 
     # 4. Monthly Workday Targets
     # For full-timers: target = num_days - (Sat+Sun+holiday) - paid_leave_days

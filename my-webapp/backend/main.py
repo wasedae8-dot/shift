@@ -298,7 +298,7 @@ def generate_schedule(year: int, month: int, facility_id: int, seed: Optional[in
         })
         
     # 3. Call the Python OR-Tools Logic
-    result = solve_schedule(year, month, staff_list, requests_list, seed=effective_seed)
+    result = solve_schedule(year, month, staff_list, requests_list, facility_id=facility_id, seed=effective_seed)
     
     if result.get("status") == "failed":
         raise HTTPException(status_code=400, detail=result.get("error"))
