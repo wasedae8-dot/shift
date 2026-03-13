@@ -35,9 +35,18 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
     headers.set('X-App-Password', password);
   }
 
-  return fetch(finalUrl, {
-    ...options,
-    headers,
-  });
+  console.log(`[API] Fetching: ${options.method || 'GET'} ${finalUrl}`);
+  
+  try {
+    const response = await fetch(finalUrl, {
+      ...options,
+      headers,
+    });
+    console.log(`[API] Response: ${response.status} ${finalUrl}`);
+    return response;
+  } catch (e) {
+    console.error(`[API] Network Error for ${finalUrl}:`, e);
+    throw e;
+  }
 };
 

@@ -205,6 +205,7 @@ function StaffFormFields({ form, onChange }: {
 }
 
 export default function StaffManagement() {
+  console.log("[StaffManagement] Component mounting...");
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
@@ -232,28 +233,42 @@ export default function StaffManagement() {
         }
     };
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    window.addEventListener('facilityChange', handleStorage as any);
+    return () => {
+        window.removeEventListener('storage', handleStorage);
+        window.removeEventListener('facilityChange', handleStorage as any);
+    };
   }, []);
 
   const fetchStaff = async () => {
     setIsLoading(true);
+    console.log("[StaffManagement] fetchStaff starting...");
     try {
-      // fetchWithAuth will automatically append facility_id if present in localStorage
       const response = await fetchWithAuth(`${API_BASE}/api/staff/`);
+      console.log("[StaffManagement] fetchStaff status:", response.status);
       if (response.ok) {
         const data = await response.json();
+        console.log("[StaffManagement] fetchStaff data count:", data.length);
         setStaffList(data);
       } else if (response.status === 401) {
         window.location.href = '/login';
+      } else {
+        const text = await response.text();
+        console.error("[StaffManagement] fetchStaff failed:", text);
+        alert(`スタッフ取得失敗: ${response.status}\n${text}`);
       }
     } catch (error) {
-      console.error("Failed to fetch staff:", error);
+      console.error("[StaffManagement] fetchStaff exception:", error);
+      alert(`通信エラー: ${(error as Error).message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => { fetchStaff(); }, [selectedFacilityId]);
+  useEffect(() => { 
+    console.log("[StaffManagement] Initializing useEffect...");
+    fetchStaff(); 
+  }, [selectedFacilityId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,11 +309,15 @@ export default function StaffManagement() {
     if (!confirm("本当に削除しますか？")) return;
     try {
       const response = await fetchWithAuth(`${API_BASE}/api/staff/${id}`, { method: 'DELETE' });
-
-
-      if (response.ok) fetchStaff();
+      if (response.ok) {
+        fetchStaff();
+      } else {
+        const errorText = await response.text();
+        alert(`削除に失敗しました (Status: ${response.status})\n${errorText}`);
+      }
     } catch (error) {
       console.error("Error deleting staff:", error);
+      alert(`削除中に通信エラーが発生しました。\n${(error as Error).message}`);
     }
   };
 
@@ -447,6 +466,7 @@ export default function StaffManagement() {
                 <thead className="bg-neutral-50 text-neutral-500 border-b border-neutral-200 sticky top-0 z-10 text-xs uppercase tracking-wider">
                   <tr>
                     <th className="px-2 py-4 w-8"></th>
+                    <th className="px-4 py-4 font-medium w-24">ID</th>
                     <th className="px-4 py-4 font-medium">氏名</th>
                     <th className="px-4 py-4 font-medium w-24">契約時間</th>
                     <th className="px-4 py-4 font-medium">種別</th>
@@ -481,6 +501,7 @@ export default function StaffManagement() {
                           <circle cx="11" cy="18" r="1.2" fill="currentColor" stroke="none"/>
                         </svg>
                       </td>
+                      <td className="px-4 py-4 text-xs font-mono text-neutral-400">#{staff.id}</td>
                       <td className="px-4 py-4 font-medium text-neutral-900">{staff.name}</td>
                       <td className="px-4 py-4 text-neutral-600 font-medium">
                         {staff.work_hours}h
@@ -574,6 +595,15 @@ export default function StaffManagement() {
           </div>
         </div>
       )}
+      
+      {/* Debug Footer */}
+      <div className="mt-20 p-4 border-t border-dashed border-neutral-200 text-[10px] text-neutral-400 font-mono">
+        <p>DEBUG INFO:</p>
+        <p>API: {API_BASE}</p>
+        <p>FacilityID: {selectedFacilityId}</p>
+        <p>StaffCount: {staffList.length}</p>
+        <p>LastFetch: {new Date().toLocaleTimeString()}</p>
+      </div>
     </div>
   );
 }

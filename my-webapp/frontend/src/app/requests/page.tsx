@@ -45,24 +45,55 @@ export default function RequestsManagement() {
 
   const fetchData = async () => {
     setIsLoading(true);
-    try {
-      const [staffRes, reqRes] = await Promise.all([
-        fetchWithAuth(`${API_BASE}/api/staff/`),
-        fetchWithAuth(`${API_BASE}/api/requests/`)
-      ]);
+    let errorCount = 0;
 
-      if (staffRes.ok && reqRes.ok) {
+    // 1. Fetch Staff (Independent)
+    try {
+      const staffRes = await fetchWithAuth(`${API_BASE}/api/staff/`);
+      if (staffRes.ok) {
         setStaffList(await staffRes.json());
-        setRequests(await reqRes.json());
+      } else if (staffRes.status === 401) {
+        window.location.href = '/login';
+      } else {
+        const errorText = await staffRes.text();
+        console.error("Staff fetch failed:", staffRes.status, errorText);
+        alert(`スタッフ情報の取得に失敗しました (Status: ${staffRes.status})\n${errorText}`);
+        errorCount++;
       }
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-    } finally {
-      setIsLoading(false);
+    } catch (e) {
+      console.error("Staff fetch network error:", e);
+      alert(`スタッフ情報の通信エラーが発生しました。\n${(e as Error).message}`);
+      errorCount++;
     }
+
+    // 2. Fetch Requests (Independent)
+    try {
+      const reqRes = await fetchWithAuth(`${API_BASE}/api/requests/`);
+      if (reqRes.ok) {
+        setRequests(await reqRes.json());
+      } else {
+        console.warn("Requests list fetch failed:", reqRes.status);
+        // We don't alert here to avoid noise if it's just a migration issue
+      }
+    } catch (e) {
+      console.error("Requests fetch network error:", e);
+    }
+
+    setIsLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { 
+    fetchData(); 
+    
+    // Listen for facility changes in sidebar
+    const handleStorage = () => fetchData();
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('facilityChange', handleStorage as any);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('facilityChange', handleStorage as any);
+    };
+  }, []);
 
   const clearAllSelections = () => {
     setKyukaDates([]);
@@ -202,9 +233,15 @@ export default function RequestsManagement() {
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-600">
-          希望休・休暇 まとめて登録
-        </h1>
+        <div className="flex flex-col">
+          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-600">
+            希望休・休暇 まとめて登録
+          </h1>
+          <div className="text-xs font-bold text-neutral-400 mt-1 flex items-center gap-2">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+            施設：{typeof window !== 'undefined' && localStorage.getItem('selected_facility_id') === '1' ? 'サンケア上池台' : 'サンケア鵜の木'}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -226,10 +263,19 @@ export default function RequestsManagement() {
               className="w-full px-4 py-3 bg-neutral-50 text-neutral-900 border-2 border-neutral-200 rounded-xl focus:ring-0 focus:border-emerald-500 font-bold text-lg cursor-pointer"
             >
               <option value="" disabled>▼ スタッフを選択してください</option>
-              {staffList.map(staff => (
-                <option key={staff.id} value={staff.id}>{staff.name}</option>
-              ))}
+              {staffList.length === 0 ? (
+                <option value="" disabled>※スタッフが見つかりません</option>
+              ) : (
+                staffList.map(staff => (
+                  <option key={staff.id} value={staff.id}>{staff.name}</option>
+                ))
+              )}
             </select>
+            {staffList.length === 0 && !isLoading && (
+              <p className="mt-2 text-xs text-red-500 bg-red-50 p-2 rounded-lg border border-red-100 font-bold">
+                ⚠️ スタッフが見つかりません。現在の施設（ID: {typeof window !== 'undefined' ? (localStorage.getItem('selected_facility_id') || '未設定') : '...'}）の設定またはスタッフ登録を確認してください。
+              </p>
+            )}
           </div>
 
           {/* Step 2: Mode + Calendar */}
@@ -403,6 +449,16 @@ export default function RequestsManagement() {
             )}
           </div>
         </div>
+      </div>
+      
+      {/* Debug Footer */}
+      <div className="mt-20 p-4 border-t border-dashed border-neutral-200 text-[10px] text-neutral-400 font-mono">
+        <p>DEBUG INFO:</p>
+        <p>API: {API_BASE}</p>
+        <p>FacilityID: {typeof window !== 'undefined' ? (localStorage.getItem('selected_facility_id') || '未設定') : '...'}</p>
+        <p>StaffCount: {staffList.length}</p>
+        <p>RequestsCount: {requests.length}</p>
+        <p>LastFetch: {new Date().toLocaleTimeString()}</p>
       </div>
     </div>
   );
