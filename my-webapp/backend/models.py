@@ -61,6 +61,7 @@ class LeaveRequest(Base):
     date = Column(String, index=True) # e.g. "2026-08-13"
     reason = Column(String, default="希望休") # 休み希望, 夏休み, etc.
     is_summer_vacation = Column(Boolean, default=False)
+    is_forced_attendance = Column(Boolean, default=False)
 
     staff = relationship("Staff", back_populates="leave_requests")
 

@@ -58,6 +58,15 @@ type OptimizationResult = {
   }[];
 };
 
+type LeaveRequest = {
+  id?: number;
+  staff_id: number;
+  date: string;
+  reason: string;
+  is_summer_vacation: boolean;
+  is_forced_attendance: boolean;
+};
+
 export default function Home() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -149,6 +158,67 @@ export default function Home() {
       setScheduleData({ status: "failed", error: "API接続エラーが発生しました。" });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+
+  const fetchLeaveRequests = async () => {
+    const facilityId = selectedFacilityId || localStorage.getItem('selected_facility_id');
+    if (!facilityId) return;
+    try {
+      const response = await fetchWithAuth(`${API_BASE}/api/requests/?facility_id=${facilityId}`);
+      if (response.ok) {
+        setLeaveRequests(await response.json());
+      }
+    } catch (error) {
+      console.error("Error fetching leave requests:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchLeaveRequests();
+  }, [selectedFacilityId]);
+
+  const toggleLeave = async (staffId: number, day: number) => {
+    const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    const existing = leaveRequests.find(r => r.staff_id === staffId && r.date === dateStr);
+    
+    // Cycle state: None -> Leave (reason='休み希望', is_forced=false) -> Forced (is_forced=true) -> None
+    let newPayload: Partial<LeaveRequest> | null = null;
+    
+    if (!existing) {
+      // To Leave
+      newPayload = { staff_id: staffId, date: dateStr, reason: '希望休', is_summer_vacation: false, is_forced_attendance: false };
+    } else if (!existing.is_forced_attendance) {
+      // To Forced Attendance
+      newPayload = { staff_id: staffId, date: dateStr, reason: '出勤指定', is_summer_vacation: false, is_forced_attendance: true };
+    } else {
+      // To None (delete)
+      try {
+        await fetchWithAuth(`${API_BASE}/api/requests/${existing.id}`, { method: 'DELETE' });
+        await fetchLeaveRequests();
+        return;
+      } catch (e) { console.error(e); return; }
+    }
+
+    try {
+      if (existing) {
+        // We don't have a PUT for requests, so delete and recreate or if we had a POST that handles upsert
+        // For simplicity, let's delete existing first if it exists
+        await fetchWithAuth(`${API_BASE}/api/requests/${existing.id}`, { method: 'DELETE' });
+      }
+      
+      const response = await fetchWithAuth(`${API_BASE}/api/requests/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPayload)
+      });
+      if (response.ok) {
+        await fetchLeaveRequests();
+      }
+    } catch (error) {
+      console.error("Error toggling leave:", error);
     }
   };
 
@@ -534,10 +604,16 @@ export default function Home() {
                   const closed = isDayClosed(day);
                   const daySchedule = scheduleData?.schedule?.find((s: DailySchedule) => s.day === day);
                   const assignment = daySchedule?.staff.find((s: StaffAssignment) => s.staff_id === staff.id);
+                  const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                  const leaveReq = leaveRequests.find(r => r.staff_id === staff.id && r.date === dateStr);
                   const absenceReason = !closed && !assignment ? absenceMap[day] : undefined;
                   
                   return (
-                    <div key={`${staff.id}-${day}`} className={`w-9 shrink-0 border-r border-neutral-200 flex items-center justify-center relative ${closed ? 'bg-neutral-200' : ''}`}>
+                    <div 
+                      key={`${staff.id}-${day}`} 
+                      onClick={() => !closed && toggleLeave(staff.id, day)}
+                      className={`w-9 shrink-0 border-r border-neutral-200 flex items-center justify-center relative cursor-pointer transition-colors hover:bg-neutral-100 ${closed ? 'bg-neutral-200' : ''}`}
+                    >
                       {closed ? (
                         <div className="w-full h-full bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.05)_4px,rgba(0,0,0,0.05)_8px)] absolute inset-0"></div>
                       ) : assignment && assignment.roles.length > 0 ? (
@@ -556,20 +632,32 @@ export default function Home() {
                             .map((r: Role, i: number) => (
                               <div key={i}>{renderRoleBadge(r)}</div>
                             ))}
+                          {leaveReq?.is_forced_attendance && (
+                            <div className="absolute top-0 right-0">
+                              <span className="flex h-3 w-3 items-center justify-center rounded-full bg-blue-500 ring-1 ring-white" title="出勤指定（絶対出勤）">
+                                <span className="text-[7px] font-black text-white">強</span>
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      ) : absenceReason ? (
+                      ) : (leaveReq || absenceReason) ? (
                         <span className={`inline-flex w-5 h-5 items-center justify-center font-bold text-[10px] rounded-full shadow-sm ${
+                          leaveReq?.is_forced_attendance ? 'bg-blue-100 text-blue-700' :
+                          (leaveReq?.is_summer_vacation || absenceReason === '夏') ? 'bg-purple-100 text-purple-700' :
+                          (leaveReq || absenceReason === '休') ? 'bg-red-100 text-red-700' :
                           absenceReason === '有' ? 'bg-blue-100 text-blue-700' :
-                          absenceReason === '夏' ? 'bg-purple-100 text-purple-700' :
-                          absenceReason === '休' ? 'bg-red-100 text-red-700' :
                           'bg-neutral-100 text-neutral-500' // 公休
-                        }`}>{absenceReason}</span>
+                        }`}>
+                          {leaveReq?.is_forced_attendance ? '出' : 
+                           (leaveReq?.is_summer_vacation || absenceReason === '夏') ? '夏' :
+                           (leaveReq || absenceReason === '休') ? '休' :
+                           absenceReason || '公'}
+                        </span>
                       ) : null}
                     </div>
                   );
                 })}
 
-                {/* Tally Cells */}
                 <div className="w-10 shrink-0 border-r border-l-2 border-l-neutral-400 border-neutral-200 flex items-center justify-center text-sm font-black bg-blue-50 text-blue-900">
                   {summary ? summary.work_days : ''}
                 </div>
@@ -577,7 +665,7 @@ export default function Home() {
                   {summary ? summary.public_holidays : ''}
                 </div>
                 <div className="w-10 shrink-0 border-neutral-200 flex items-center justify-center text-sm font-bold bg-orange-50 text-orange-700">
-                  {summary ? (summary.paid_leaves > 0 ? summary.paid_leaves : '') : ''}
+                  {summary && summary.paid_leaves > 0 ? summary.paid_leaves : ''}
                 </div>
               </div>
             );
@@ -608,6 +696,7 @@ export default function Home() {
                       </div>
                     );
                   })}
+                  
                   {/* Empty tally cells for footer rows */}
                   <div className="w-10 shrink-0 border-l-2 border-l-neutral-400" />
                   <div className="w-10 shrink-0" />

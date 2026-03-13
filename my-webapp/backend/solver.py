@@ -288,11 +288,15 @@ def solve_schedule(year: int, month: int, staff_list: List[Dict], requests: List
             s_idx = next((i for i, v in enumerate(staff_list) if v['id'] == staff_id), -1)
             
             if s_idx != -1 and d in operating_days:
-                # Violation variable: 1 if shift is 1 (staff works) even though they requested leave (0)
-                v_var = model.NewBoolVar(f'leave_violation_s{s_idx}_d{d}')
-                model.Add(v_var == shifts[(s_idx, d)])
-                objective_terms.append(v_var * -W_LEAVE_REQUEST)
-                violation_vars[(s_idx, d)] = v_var
+                if req.get('is_forced_attendance'):
+                    # Forced Attendance is a hard constraint (MUST work)
+                    model.Add(shifts[(s_idx, d)] == 1)
+                else:
+                    # Violation variable: 1 if shift is 1 (staff works) even though they requested leave (0)
+                    v_var = model.NewBoolVar(f'leave_violation_s{s_idx}_d{d}')
+                    model.Add(v_var == shifts[(s_idx, d)])
+                    objective_terms.append(v_var * -W_LEAVE_REQUEST)
+                    violation_vars[(s_idx, d)] = v_var
 
     # 6. No 5 consecutive workdays (Soft Constraint - penalty-based)
     # Add penalty when 5 consecutive days are all worked

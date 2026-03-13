@@ -52,6 +52,7 @@ class LeaveRequestBase(BaseModel):
     date: str
     reason: Optional[str] = "希望休"
     is_summer_vacation: bool = False
+    is_forced_attendance: bool = False
 
 class LeaveRequestCreate(LeaveRequestBase):
     pass

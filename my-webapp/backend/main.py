@@ -367,7 +367,8 @@ def generate_schedule(year: int, month: int, facility_id: int, seed: Optional[in
             "staff_id": r.staff_id,
             "date": r.date,
             "reason": r.reason,
-            "is_summer_vacation": r.is_summer_vacation
+            "is_summer_vacation": r.is_summer_vacation,
+            "is_forced_attendance": r.is_forced_attendance
         })
     
     # 3. Fetch daily constraints
