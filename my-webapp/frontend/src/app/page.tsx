@@ -455,6 +455,28 @@ export default function Home() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-6 mb-8 px-6 py-3 bg-white rounded-2xl shadow-sm border border-neutral-100/50">
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-red-100 text-red-700 flex items-center justify-center font-bold text-[10px] shadow-sm">休</span>
+          <span className="text-xs font-bold text-neutral-600">休み希望 (公休/有給)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px] shadow-sm">出</span>
+          <span className="text-xs font-bold text-neutral-600">出勤指定 (絶対出勤)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-[10px] shadow-sm">夏</span>
+          <span className="text-xs font-bold text-neutral-600">夏期休暇</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative w-5 h-5">
+            <div className="w-full h-full rounded bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-700">介</div>
+            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full ring-1 ring-white"></div>
+          </div>
+          <span className="text-xs font-bold text-neutral-600">出勤指定（割り当て中）</span>
+        </div>
+      </div>
+
       {scheduleData && scheduleData.status === "failed" && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 shadow-sm flex items-start gap-4">
           <svg className="w-6 h-6 text-red-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>

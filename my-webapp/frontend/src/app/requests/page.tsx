@@ -21,7 +21,7 @@ type LeaveRequest = {
 };
 
 // Mode for which type of leave is being selected
-type SelectMode = '希望休' | '有給' | '夏期休暇';
+type SelectMode = '希望休' | '有給' | '夏期休暇' | '出勤指定';
 
 export default function RequestsManagement() {
   const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -39,6 +39,7 @@ export default function RequestsManagement() {
   const [kyukaDates, setKyukaDates] = useState<Date[]>([]);    // 希望休
   const [yukyuDates, setYukyuDates] = useState<Date[]>([]);   // 有給
   const [natsuDates, setNatsuDates] = useState<Date[]>([]);   // 夏期休暇
+  const [forceDates, setForceDates] = useState<Date[]>([]);   // 出勤指定
   
   // Calendar View state
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -99,24 +100,28 @@ export default function RequestsManagement() {
     setKyukaDates([]);
     setYukyuDates([]);
     setNatsuDates([]);
+    setForceDates([]);
   };
 
   const getSelectedDatesForMode = (mode: SelectMode) => {
     if (mode === '希望休') return kyukaDates;
     if (mode === '有給') return yukyuDates;
-    return natsuDates;
+    if (mode === '夏期休暇') return natsuDates;
+    return forceDates;
   };
 
   const setSelectedDatesForMode = (mode: SelectMode, updater: (prev: Date[]) => Date[]) => {
     if (mode === '希望休') setKyukaDates(updater);
     else if (mode === '有給') setYukyuDates(updater);
-    else setNatsuDates(updater);
+    else if (mode === '夏期休暇') setNatsuDates(updater);
+    else setForceDates(updater);
   };
 
   const getDateType = (date: Date): SelectMode | null => {
     if (kyukaDates.some(d => isSameDay(d, date))) return '希望休';
     if (yukyuDates.some(d => isSameDay(d, date))) return '有給';
     if (natsuDates.some(d => isSameDay(d, date))) return '夏期休暇';
+    if (forceDates.some(d => isSameDay(d, date))) return '出勤指定';
     return null;
   };
 
@@ -134,7 +139,7 @@ export default function RequestsManagement() {
     setSelectedDatesForMode(selectMode, prev => [...prev, date]);
   };
 
-  const totalSelected = kyukaDates.length + yukyuDates.length + natsuDates.length;
+  const totalSelected = kyukaDates.length + yukyuDates.length + natsuDates.length + forceDates.length;
 
   const handleSubmit = async () => {
     if (!selectedStaffId) { alert("スタッフを選択してください。"); return; }
@@ -150,7 +155,10 @@ export default function RequestsManagement() {
         allRequests.push({ staff_id: Number(selectedStaffId), date: format(date, 'yyyy-MM-dd'), reason: '有給', is_summer_vacation: false });
       });
       natsuDates.forEach(date => {
-        allRequests.push({ staff_id: Number(selectedStaffId), date: format(date, 'yyyy-MM-dd'), reason: '夏期休暇', is_summer_vacation: true });
+        allRequests.push({ staff_id: Number(selectedStaffId), date: format(date, 'yyyy-MM-dd'), reason: '夏期休暇', is_summer_vacation: true, is_forced_attendance: false } as any);
+      });
+      forceDates.forEach(date => {
+        allRequests.push({ staff_id: Number(selectedStaffId), date: format(date, 'yyyy-MM-dd'), reason: '出勤指定', is_summer_vacation: false, is_forced_attendance: true } as any);
       });
 
       const promises = allRequests.map(req =>
@@ -228,6 +236,7 @@ export default function RequestsManagement() {
     '希望休': { color: 'text-emerald-700', bgActive: 'bg-emerald-500 border-emerald-600 text-white', badge: 'bg-emerald-100 text-emerald-800', label: '希望休' },
     '有給':   { color: 'text-blue-700',    bgActive: 'bg-blue-500 border-blue-600 text-white',     badge: 'bg-blue-100 text-blue-800',   label: '有給休暇' },
     '夏期休暇': { color: 'text-orange-700',  bgActive: 'bg-orange-500 border-orange-600 text-white', badge: 'bg-orange-100 text-orange-800', label: '夏期休暇' },
+    '出勤指定': { color: 'text-blue-900', bgActive: 'bg-blue-900 border-blue-950 text-white', badge: 'bg-blue-200 text-blue-900', label: '出勤指定' },
   };
 
   return (
@@ -295,7 +304,7 @@ export default function RequestsManagement() {
                   onClick={() => setSelectMode(mode)}
                   className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-bold transition-all ${selectMode === mode ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-500 hover:text-neutral-700'}`}
                 >
-                  <span className={`inline-block w-2.5 h-2.5 rounded-full mr-1.5 ${mode === '希望休' ? 'bg-emerald-400' : mode === '有給' ? 'bg-blue-400' : 'bg-orange-400'}`}></span>
+                  <span className={`inline-block w-2.5 h-2.5 rounded-full mr-1.5 ${mode === '希望休' ? 'bg-emerald-400' : mode === '有給' ? 'bg-blue-400' : mode === '夏期休暇' ? 'bg-orange-400' : 'bg-blue-900'}`}></span>
                   {MODE_CONFIG[mode].label}
                   {getSelectedDatesForMode(mode).length > 0 && (
                     <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${MODE_CONFIG[mode].badge} font-black`}>
@@ -372,6 +381,7 @@ export default function RequestsManagement() {
                   {kyukaDates.length > 0 && <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full">希望休 {kyukaDates.length}日</span>}
                   {yukyuDates.length > 0 && <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">有給 {yukyuDates.length}日</span>}
                   {natsuDates.length > 0 && <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full">夏期休暇 {natsuDates.length}日</span>}
+                  {forceDates.length > 0 && <span className="px-3 py-1 bg-blue-900 text-white rounded-full">出勤指定 {forceDates.length}日</span>}
                   <span className="text-neutral-500">計 {totalSelected}件</span>
                 </div>
                 <button
@@ -419,8 +429,9 @@ export default function RequestsManagement() {
                 {requests.slice().sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((req) => {
                   const isYukyu = req.reason === '有給' || req.reason.includes('有給') || req.reason.includes('有休');
                   const isNatsu = req.is_summer_vacation || req.reason.includes('夏');
-                  const badgeColor = isNatsu ? 'bg-orange-100 text-orange-800' : isYukyu ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800';
-                  const barColor = isNatsu ? 'bg-orange-400' : isYukyu ? 'bg-blue-400' : 'bg-emerald-400';
+                  const isForced = (req as any).is_forced_attendance || req.reason === '出勤指定';
+                  const badgeColor = isForced ? 'bg-blue-900 text-white' : isNatsu ? 'bg-orange-100 text-orange-800' : isYukyu ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800';
+                  const barColor = isForced ? 'bg-blue-900' : isNatsu ? 'bg-orange-400' : isYukyu ? 'bg-blue-400' : 'bg-emerald-400';
 
                   return (
                     <div key={req.id} className="group relative flex items-center justify-between p-3 rounded-xl border border-neutral-200 hover:border-neutral-400 overflow-hidden bg-white shadow-sm transition-colors">
