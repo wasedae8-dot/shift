@@ -35,7 +35,9 @@ async def startup_event():
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0"))
             conn.execute(text("ALTER TABLE staff ADD COLUMN IF NOT EXISTS work_hours INTEGER NOT NULL DEFAULT 8"))
-        print("INFO: Migration (sort_order, work_hours) verified.")
+            # New migration for forced attendance
+            conn.execute(text("ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS is_forced_attendance BOOLEAN DEFAULT FALSE"))
+        print("INFO: Migration (sort_order, work_hours, is_forced_attendance) verified.")
         
         # Create default facilities if none exist to match UI options (id: 1, 2)
         from database import SessionLocal
